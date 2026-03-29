@@ -100,18 +100,32 @@ def get_session():
 
 # ── Price fetch ───────────────────────────────────────────────────────────────
 def fetch_bars():
-    """Fetch last 100 bars of NQ 5-min data via yfinance."""
-    try:
-        import yfinance as yf
-        bars = yf.download("NQ=F", period="1d", interval="5m", progress=False, auto_adjust=True)
-        if bars is None or len(bars) < 10:
-            return None
-        bars.columns = [c[0] if isinstance(c, tuple) else c for c in bars.columns]
-        bars = bars[["Open", "High", "Low", "Close", "Volume"]].dropna()
-        return bars if len(bars) >= 10 else None
-    except Exception as e:
-        print(f"Price fetch error: {e}")
-        return None
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json",
+        "Referer": "https://finance.yahoo.com",
+    }
+    for url in [
+        "https://query2.finance.yahoo.com/v8/finance/chart/NQ=F?interval=5m&range=2d",
+        "https://query1.finance.yahoo.com/v8/finance/chart/NQ=F?interval=5m&range=2d",
+    ]:
+        try:
+            r = req.get(url, headers=headers, timeout=10)
+            js = r.json()
+            res = js["chart"]["result"][0]
+            if "timestamp" not in res:
+                continue
+            ts = res["timestamp"]
+            q = res["indicators"]["quote"][0]
+            bars = pd.DataFrame({
+                "Close": q["close"], "High": q["high"],
+                "Low": q["low"], "Open": q["open"], "Volume": q["volume"],
+            }, index=pd.to_datetime(ts, unit="s", utc=True)).dropna()
+            if len(bars) >= 10:
+                return bars
+        except Exception as e:
+            print(f"Price fetch error: {e}")
+    return None
 
 # ── Feature engineering ───────────────────────────────────────────────────────
 def engineer(raw):
