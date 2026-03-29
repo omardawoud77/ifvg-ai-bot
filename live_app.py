@@ -889,4 +889,4 @@ if __name__ == "__main__":
     print("\n🤖 IFVG Live AI v6 — Auto Paper Trading + AI Learning")
     print(f"📡 Price source: {'TradingView (NQ1! CME)' if USE_TV else 'Yahoo Finance (fallback)'}")
     print("📱 Open: http://localhost:5001\n")
-    app.run(debug=False, port=5001)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5001)), debug=False)
