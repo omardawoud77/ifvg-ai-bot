@@ -1,7 +1,7 @@
-pandas
-numpy
-scikit-learn
-xgboost
-matplotlib
-seaborn
+flask
 joblib
+numpy
+pandas
+requests
+scikit-learn
+yfinance
