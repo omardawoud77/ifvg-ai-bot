@@ -952,7 +952,7 @@ HTML = """<!DOCTYPE html>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>IFVG Live AI v7</title>
 <style>
-:root{--bg:#0a0c0f;--surface:#111318;--border:#1e2229;--text:#e8eaf0;--muted:#5a6070;--green:#00e5a0;--red:#ff4d6d;--amber:#ffb627;--blue:#4d9fff;--purple:#b06fff}
+:root{--bg:#f8f9fa;--surface:#ffffff;--border:#e2e8f0;--text:#1a202c;--muted:#718096;--green:#00a67e;--red:#e53e3e;--amber:#d97706;--blue:#2b6cb0;--purple:#6b46c1}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;padding:16px}
 .wrap{max-width:520px;margin:0 auto}
