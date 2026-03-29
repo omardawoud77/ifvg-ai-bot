@@ -36,7 +36,7 @@ except Exception as e:
 TRADE_LOG       = "live_trades.json"
 RR              = 2.0
 MNQ_PTS_TO_USD  = 2.0
-SCORE_THRESHOLD = 70
+SCORE_THRESHOLD = 78
 
 last_fetch   = 0
 INTERVAL     = 15
