@@ -132,12 +132,11 @@ def fetch_tf(interval, range_str, n_bars=100):
     for attempt in range(2):
         for host in ["query2", "query1"]:
             try:
-                url = f"https://{host}.finance.yahoo.com/v8/finance/chart/NQ=F"
-                params = {"interval": interval, "range": range_str}
+                url = f"https://{host}.finance.yahoo.com/v8/finance/chart/NQ=F?interval={interval}&range={range_str}"
                 if _yf_crumb:
-                    params["crumb"] = _yf_crumb
+                    url += f"&crumb={_yf_crumb}"
                 hdrs = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", "Accept": "application/json"}
-                r = (_yf_session or req).get(url, params=params, headers=hdrs, timeout=12)
+                r = (_yf_session or req).get(url, headers=hdrs, timeout=12)
                 if r.status_code == 429:
                     print(f"429 on {host}")
                     _yf_crumb = None
