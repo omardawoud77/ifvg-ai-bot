@@ -16,7 +16,14 @@ ICT Layer (NEW in v7):
 
 from flask import Flask, jsonify, render_template_string, request as freq
 import joblib, numpy as np, pandas as pd
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+
+def now_et():
+    """Return current time in ET (UTC-4 in summer / EDT)."""
+    return datetime.now(timezone.utc) + timedelta(hours=-4)
+
+def et_str(fmt="%H:%M:%S"):
+    return now_et().strftime(fmt)
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 import sys, json, os, time, threading, requests as req
@@ -820,7 +827,7 @@ def retrain_model_async(closed_trade):
                 joblib.dump({"model": new_model, "label_encoders": les, "feature_cols": FCOLS}, "model.pkl")
                 model = new_model
                 state["model_version"] += 1
-                state["last_retrain"]   = datetime.now().strftime("%H:%M:%S")
+                state["last_retrain"]   = et_str()
                 print(f"✅ Retrain complete — v{state['model_version']} | {len(X)} samples")
             except Exception as e:
                 import traceback; print(f"❌ Retrain failed: {e}\n{traceback.format_exc()}")
@@ -829,7 +836,7 @@ def retrain_model_async(closed_trade):
 # ── Close trade ───────────────────────────────────────────────────────────────
 def _close_active(result, at, price):
     at["result"]     = result
-    at["exit_time"]  = datetime.now().strftime("%H:%M:%S")
+    at["exit_time"]  = et_str()
     at["exit_price"] = round(price, 2)
     at["pnl_pts"]    = round(abs(at["tp"]-at["entry"]),1) if result=="win" else round(-abs(at["sl"]-at["entry"]),1)
     at["pnl_usd"]    = round(at["pnl_pts"] * MNQ_PTS_TO_USD, 2)
@@ -915,7 +922,7 @@ def fetch_and_score():
 
         if alert and not state.get("active_trade"):
             new_trade = {
-                "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "time": et_str("%Y-%m-%d %H:%M:%S"),
                 "direction": direction, "entry": price,
                 "sl": sl_price, "tp": tp_price,
                 "score": final_score, "base_score": base_score, "ict_score": ict_score,
@@ -942,7 +949,7 @@ def fetch_and_score():
             "vol_ratio": round(vol_ratio,2), "session": session,
             "htf_bias": htf_bias, "sl_dist": sl_dist,
             "price": round(price,2), "sl_price": sl_price, "tp_price": tp_price,
-            "last_update": datetime.now().strftime("%H:%M:%S"),
+            "last_update": et_str(),
             "error": None, "factors": get_base_factors(raw),
             "ict_factors": ict_factors, "trade_type": trade_type,
             "alert": alert, "alert_msg": alert_msg,
@@ -957,7 +964,7 @@ def fetch_and_score():
     except Exception as e:
         import traceback
         state["error"] = str(e)
-        state["last_update"] = datetime.now().strftime("%H:%M:%S")
+        state["last_update"] = et_str()
         print(f"Error: {e}\n{traceback.format_exc()}")
 
 # ── HTML ──────────────────────────────────────────────────────────────────────
