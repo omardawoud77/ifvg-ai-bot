@@ -385,25 +385,30 @@ def detect_absorption(bars_5m, lookback=10):
     return {"absorbed": False, "type": None, "vol_ratio": 0}
 
 def get_kill_zone():
-    """More precise kill zone detection than basic session."""
+    """Kill zone detection using ET (Eastern Time = UTC-4 in summer, UTC-5 in winter).
+    All times below are ET converted to UTC minutes for comparison."""
     now  = datetime.now(timezone.utc)
-    hour = now.hour
-    mins = now.hour * 60 + now.minute
+    mins = now.hour * 60 + now.minute  # UTC minutes since midnight
 
-    # London open: 2:00-5:00 AM UTC
-    if 2 <= hour < 5:
+    # London open:  2:00-5:00 AM ET  = 06:00-09:00 UTC = 360-540 mins
+    if 360 <= mins < 540:
         return "london_open", True
-    # NY open: 9:30-11:00 AM UTC (14:30-16:00 UTC)
-    if 870 <= mins < 960:
+
+    # NY open:      9:30-11:00 AM ET = 13:30-15:00 UTC = 810-900 mins
+    if 810 <= mins < 900:
         return "ny_open", True
-    # London close / NY overlap: 3:00-4:00 PM UTC
+
+    # London close: 10:00-12:00 PM ET = 14:00-16:00 UTC = 840-960 mins
+    # (overlaps NY open — included as bonus kill zone)
     if 900 <= mins < 960:
         return "london_close", True
-    # NY PM session: 1:30-3:00 PM UTC
-    if 810 <= mins < 900:
+
+    # NY PM:        1:30-3:00 PM ET  = 17:30-19:00 UTC = 1050-1140 mins
+    if 1050 <= mins < 1140:
         return "ny_pm", True
-    # Asia: 8 PM - 2 AM UTC
-    if hour >= 20 or hour < 2:
+
+    # Asia:         8:00 PM - 2:00 AM ET = 00:00-06:00 UTC = 0-360 mins
+    if mins < 360 or mins >= 1380:
         return "asia", False
 
     return "transition", False
