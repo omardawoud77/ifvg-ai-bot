@@ -128,35 +128,38 @@ def get_yf_crumb():
         return None, None
 
 def fetch_tf(interval, range_str, n_bars=100):
-    global _yf_crumb
-    session, crumb = get_yf_crumb()
-    for host in ["query2", "query1"]:
-        try:
-            url = f"https://{host}.finance.yahoo.com/v8/finance/chart/NQ=F"
-            params = {"interval": interval, "range": range_str}
-            if crumb:
-                params["crumb"] = crumb
-            r = (session or req).get(url, params=params, timeout=12)
-            if r.status_code == 429:
-                print(f"429 on {host} — resetting crumb")
-                _yf_crumb = None
-                continue
-            if r.status_code != 200:
-                continue
-            js = r.json()
-            res = js["chart"]["result"][0]
-            if "timestamp" not in res:
-                continue
-            ts = res["timestamp"]
-            q = res["indicators"]["quote"][0]
-            bars = pd.DataFrame({
-                "Open": q["open"], "High": q["high"],
-                "Low": q["low"], "Close": q["close"],
-                "Volume": q["volume"],
-            }, index=pd.to_datetime(ts, unit="s", utc=True)).dropna()
-            return bars.tail(n_bars) if len(bars) >= 5 else None
-        except Exception as e:
-            print(f"fetch_tf error ({interval}/{host}): {e}")
+    global _yf_crumb, _yf_session
+    for attempt in range(2):
+        for host in ["query2", "query1"]:
+            try:
+                url = f"https://{host}.finance.yahoo.com/v8/finance/chart/NQ=F"
+                params = {"interval": interval, "range": range_str}
+                if _yf_crumb:
+                    params["crumb"] = _yf_crumb
+                r = (_yf_session or req).get(url, params=params, timeout=12)
+                if r.status_code == 429:
+                    print(f"429 on {host}")
+                    _yf_crumb = None
+                    _yf_session = None
+                    continue
+                if r.status_code != 200:
+                    continue
+                js = r.json()
+                res = js["chart"]["result"][0]
+                if "timestamp" not in res:
+                    continue
+                ts = res["timestamp"]
+                q = res["indicators"]["quote"][0]
+                bars = pd.DataFrame({
+                    "Open": q["open"], "High": q["high"],
+                    "Low": q["low"], "Close": q["close"],
+                    "Volume": q["volume"],
+                }, index=pd.to_datetime(ts, unit="s", utc=True)).dropna()
+                return bars.tail(n_bars) if len(bars) >= 5 else None
+            except Exception as e:
+                print(f"fetch_tf error ({interval}/{host}): {e}")
+        if attempt == 0:
+            get_yf_crumb()
     return None
 
 def fetch_all_timeframes():
