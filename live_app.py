@@ -136,7 +136,8 @@ def fetch_tf(interval, range_str, n_bars=100):
                 params = {"interval": interval, "range": range_str}
                 if _yf_crumb:
                     params["crumb"] = _yf_crumb
-                r = (_yf_session or req).get(url, params=params, timeout=12)
+                hdrs = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", "Accept": "application/json"}
+                r = (_yf_session or req).get(url, params=params, headers=hdrs, timeout=12)
                 if r.status_code == 429:
                     print(f"429 on {host}")
                     _yf_crumb = None
