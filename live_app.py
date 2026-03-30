@@ -107,50 +107,54 @@ HEADERS = {
     "Referer": "https://finance.yahoo.com",
 }
 
-def fetch_tf(interval, range_str, n_bars=100):
-    """Fetch bars for a given Yahoo Finance interval."""
-    for host in ["query2", "query1"]:
-        try:
-            url = f"https://{host}.finance.yahoo.com/v8/finance/chart/NQ=F?interval={interval}&range={range_str}"
-            r = req.get(url, headers=HEADERS, timeout=12)
-            js = r.json()
-            res = js["chart"]["result"][0]
-            if "timestamp" not in res:
-                continue
-            ts = res["timestamp"]
-            q  = res["indicators"]["quote"][0]
-            bars = pd.DataFrame({
-                "Open":   q["open"],   "High":   q["high"],
-                "Low":    q["low"],    "Close":  q["close"],
-                "Volume": q["volume"],
-            }, index=pd.to_datetime(ts, unit="s", utc=True)).dropna()
-            return bars.tail(n_bars) if len(bars) >= 5 else None
-        except Exception as e:
-            print(f"fetch_tf error ({interval}/{host}): {e}")
-    return None
+POLYGON_KEY = "xhBbpB5Cq0eSUwCgT2CfqChaIfdIpc5Y"
+
+def fetch_tf_polygon(symbol, timespan, multiplier, from_date, to_date, limit=200):
+    """Fetch bars from Polygon.io — works from any server, no IP blocking."""
+    try:
+        url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/range/{multiplier}/{timespan}/{from_date}/{to_date}"
+        r = req.get(url, params={"adjusted": "true", "sort": "asc", "limit": limit, "apiKey": POLYGON_KEY}, timeout=12)
+        js = r.json()
+        if js.get("status") not in ("OK", "DELAYED") or not js.get("results"):
+            return None
+        df = pd.DataFrame(js["results"])
+        df.index = pd.to_datetime(df["t"], unit="ms", utc=True)
+        df = df.rename(columns={"o": "Open", "h": "High", "l": "Low", "c": "Close", "v": "Volume"})
+        return df[["Open", "High", "Low", "Close", "Volume"]].dropna()
+    except Exception as e:
+        print(f"Polygon fetch error ({timespan}/{multiplier}): {e}")
+        return None
 
 def fetch_all_timeframes():
     global last_htf_fetch, cached_htf
     now = time.time()
     bars = {}
+    from datetime import date, timedelta
+    today = date.today().isoformat()
+    d2    = (date.today() - timedelta(days=2)).isoformat()
+    d7    = (date.today() - timedelta(days=7)).isoformat()
+    d35   = (date.today() - timedelta(days=35)).isoformat()
+    d200  = (date.today() - timedelta(days=200)).isoformat()
+    d730  = (date.today() - timedelta(days=730)).isoformat()
 
-    # 5m and 15m — fetch every cycle (fast changing)
-    bars["5m"]  = fetch_tf("5m",  "2d",  100)
+    # NQ continuous futures ticker on Polygon
+    SYM = "NQ:CME"
+
+    # 5m and 15m — every cycle
+    bars["5m"]  = fetch_tf_polygon(SYM, "minute", 5,  d2,   today, limit=100)
     time.sleep(0.3)
-    bars["15m"] = fetch_tf("15m", "5d",  100)
+    bars["15m"] = fetch_tf_polygon(SYM, "minute", 15, d7,   today, limit=100)
     time.sleep(0.3)
 
-    # Weekly, Daily, 4H, 1H — fetch every 5 minutes only
+    # HTF — every 5 minutes
     if now - last_htf_fetch > HTF_INTERVAL or not cached_htf:
+        bars["1h"]     = fetch_tf_polygon(SYM, "hour",  1,  d35,  today, limit=200)
         time.sleep(0.3)
-        bars["weekly"] = fetch_tf("1wk", "2y",  52)
+        bars["daily"]  = fetch_tf_polygon(SYM, "day",   1,  d200, today, limit=120)
         time.sleep(0.3)
-        bars["daily"]  = fetch_tf("1d",  "6mo", 120)
-        time.sleep(0.3)
-        bars["1h"]     = fetch_tf("1h",  "30d", 200)
+        bars["weekly"] = fetch_tf_polygon(SYM, "week",  1,  d730, today, limit=52)
         time.sleep(0.3)
 
-        # Resample 1h to 4h
         if bars["1h"] is not None and len(bars["1h"]) >= 4:
             try:
                 bars["4h"] = bars["1h"].resample("4h").agg({
@@ -164,9 +168,8 @@ def fetch_all_timeframes():
 
         cached_htf = {k: bars[k] for k in ["weekly","daily","1h","4h"] if k in bars}
         last_htf_fetch = now
-        print(f"📊 HTF data refreshed")
+        print("📊 HTF data refreshed via Polygon")
     else:
-        # Use cached HTF data
         bars.update(cached_htf)
 
     return bars
