@@ -39,9 +39,9 @@ MNQ_PTS_TO_USD  = 2.0
 SCORE_THRESHOLD = 78
 
 last_fetch   = 0
-INTERVAL     = 15
+INTERVAL     = 30
 last_htf_fetch = 0
-HTF_INTERVAL = 300  # fetch weekly/daily/4H every 5 minutes only
+HTF_INTERVAL = 600  # fetch weekly/daily/4H every 10 minutes only
 cached_htf = {}
 retrain_lock = threading.Lock()
 
