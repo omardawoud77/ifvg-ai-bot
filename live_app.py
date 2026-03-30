@@ -40,6 +40,9 @@ SCORE_THRESHOLD = 78
 
 last_fetch   = 0
 INTERVAL     = 15
+last_htf_fetch = 0
+HTF_INTERVAL = 300  # fetch weekly/daily/4H every 5 minutes only
+cached_htf = {}
 retrain_lock = threading.Lock()
 
 # ── State ─────────────────────────────────────────────────────────────────────
@@ -127,25 +130,44 @@ def fetch_tf(interval, range_str, n_bars=100):
     return None
 
 def fetch_all_timeframes():
-    """Fetch all required timeframes. Returns dict of DataFrames."""
+    global last_htf_fetch, cached_htf
+    now = time.time()
     bars = {}
-    bars["weekly"] = fetch_tf("1wk", "2y",  52)
-    bars["daily"]  = fetch_tf("1d",  "6mo", 120)
-    bars["1h"]     = fetch_tf("1h",  "30d", 200)
-    bars["15m"]    = fetch_tf("15m", "5d",  100)
-    bars["5m"]     = fetch_tf("5m",  "2d",  100)
 
-    # Resample 1h → 4h
-    if bars["1h"] is not None and len(bars["1h"]) >= 4:
-        try:
-            bars["4h"] = bars["1h"].resample("4h").agg({
-                "Open": "first", "High": "max",
-                "Low": "min",    "Close": "last", "Volume": "sum"
-            }).dropna().tail(60)
-        except:
+    # 5m and 15m — fetch every cycle (fast changing)
+    bars["5m"]  = fetch_tf("5m",  "2d",  100)
+    time.sleep(0.3)
+    bars["15m"] = fetch_tf("15m", "5d",  100)
+    time.sleep(0.3)
+
+    # Weekly, Daily, 4H, 1H — fetch every 5 minutes only
+    if now - last_htf_fetch > HTF_INTERVAL or not cached_htf:
+        time.sleep(0.3)
+        bars["weekly"] = fetch_tf("1wk", "2y",  52)
+        time.sleep(0.3)
+        bars["daily"]  = fetch_tf("1d",  "6mo", 120)
+        time.sleep(0.3)
+        bars["1h"]     = fetch_tf("1h",  "30d", 200)
+        time.sleep(0.3)
+
+        # Resample 1h to 4h
+        if bars["1h"] is not None and len(bars["1h"]) >= 4:
+            try:
+                bars["4h"] = bars["1h"].resample("4h").agg({
+                    "Open": "first", "High": "max",
+                    "Low": "min", "Close": "last", "Volume": "sum"
+                }).dropna().tail(60)
+            except:
+                bars["4h"] = None
+        else:
             bars["4h"] = None
+
+        cached_htf = {k: bars[k] for k in ["weekly","daily","1h","4h"] if k in bars}
+        last_htf_fetch = now
+        print(f"📊 HTF data refreshed")
     else:
-        bars["4h"] = None
+        # Use cached HTF data
+        bars.update(cached_htf)
 
     return bars
 
