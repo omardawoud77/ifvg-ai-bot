@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 import sys, json, os, time, threading, requests as req
+import yfinance as yf
 
 app = Flask(__name__)
 
