@@ -39,9 +39,9 @@ MNQ_PTS_TO_USD  = 2.0
 SCORE_THRESHOLD = 78
 
 last_fetch   = 0
-INTERVAL     = 30
+INTERVAL     = 15
 last_htf_fetch = 0
-HTF_INTERVAL = 600  # fetch weekly/daily/4H every 10 minutes only
+HTF_INTERVAL = 900  # 15 min for HTF  # fetch weekly/daily/4H every 10 minutes only
 cached_htf = {}
 retrain_lock = threading.Lock()
 
@@ -167,19 +167,21 @@ def fetch_all_timeframes():
     now = time.time()
     bars = {}
 
+    # ── Fast timeframes: 5m every cycle, 15m every cycle ──────────────────────
     bars["5m"]  = fetch_tf("5m",  "2d",  100)
-    time.sleep(0.5)
+    time.sleep(2)
     bars["15m"] = fetch_tf("15m", "5d",  100)
-    time.sleep(0.5)
+    time.sleep(2)
 
+    # ── Slow timeframes: only refresh every HTF_INTERVAL ──────────────────────
     if now - last_htf_fetch > HTF_INTERVAL or not cached_htf:
-        time.sleep(0.5)
-        bars["weekly"] = fetch_tf("1wk", "2y",  52)
-        time.sleep(0.5)
-        bars["daily"]  = fetch_tf("1d",  "6mo", 120)
-        time.sleep(0.5)
+        time.sleep(2)
         bars["1h"]     = fetch_tf("1h",  "30d", 200)
-        time.sleep(0.5)
+        time.sleep(2)
+        bars["daily"]  = fetch_tf("1d",  "6mo", 120)
+        time.sleep(2)
+        bars["weekly"] = fetch_tf("1wk", "2y",  52)
+        time.sleep(2)
 
         if bars["1h"] is not None and len(bars["1h"]) >= 4:
             try:
