@@ -1509,7 +1509,9 @@ def background_loop():
         try:
             fetch_and_score()
         except Exception as e:
-            print(f"Background loop error: {e}")
+            print(f"Background loop error: {e} — sleeping 30s before retry")
+            time.sleep(30)
+            continue
         time.sleep(INTERVAL)
 
 if __name__ == "__main__":
