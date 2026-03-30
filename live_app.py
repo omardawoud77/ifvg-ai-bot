@@ -118,7 +118,13 @@ def get_yf_crumb():
         })
         _yf_session.get("https://fc.yahoo.com", timeout=5)
         r = _yf_session.get("https://query1.finance.yahoo.com/v1/test/getcrumb", timeout=5)
-        _yf_crumb = r.text.strip()
+        crumb_text = r.text.strip()
+        if r.status_code != 200 or len(crumb_text) > 50 or ' ' in crumb_text:
+            print(f"⚠️ Bad crumb response: {crumb_text[:30]}")
+            _yf_session = None
+            _yf_crumb = None
+            return None, None
+        _yf_crumb = crumb_text
         print(f"✅ Yahoo crumb obtained: {_yf_crumb[:8]}...")
         return _yf_session, _yf_crumb
     except Exception as e:
