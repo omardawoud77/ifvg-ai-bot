@@ -1541,6 +1541,8 @@ def close_trade():
 
 def background_loop():
     """Background thread: fetch and score every INTERVAL seconds."""
+    print("⏳ Startup delay 60s — letting Railway IP settle...")
+    time.sleep(60)
     while True:
         try:
             fetch_and_score()
