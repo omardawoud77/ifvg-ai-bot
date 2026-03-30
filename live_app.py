@@ -101,72 +101,21 @@ TF_MAP = {
     "5m":      ("5m",  "2d"),
 }
 
-_yf_session = None
-_yf_crumb = None
-
-def get_yf_crumb():
-    global _yf_session, _yf_crumb
-    if _yf_crumb:
-        return _yf_session, _yf_crumb
-    try:
-        _yf_session = req.Session()
-        _yf_session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5",
-            "Accept-Encoding": "gzip, deflate, br",
-        })
-        _yf_session.get("https://fc.yahoo.com", timeout=5)
-        r = _yf_session.get("https://query1.finance.yahoo.com/v1/test/getcrumb", timeout=5)
-        crumb_text = r.text.strip()
-        if r.status_code != 200 or len(crumb_text) > 50 or ' ' in crumb_text:
-            print(f"⚠️ Bad crumb response: {crumb_text[:30]}")
-            _yf_session = None
-            _yf_crumb = None
-            return None, None
-        _yf_crumb = crumb_text
-        print(f"✅ Yahoo crumb obtained: {_yf_crumb[:8]}...")
-        return _yf_session, _yf_crumb
-    except Exception as e:
-        print(f"Crumb fetch failed: {e}")
-        _yf_session = None
-        _yf_crumb = None
-        return None, None
-
 def fetch_tf(interval, range_str, n_bars=100):
-    global _yf_crumb, _yf_session
-    for attempt in range(2):
-        for host in ["query2", "query1"]:
-            try:
-                url = f"https://{host}.finance.yahoo.com/v8/finance/chart/NQ=F?interval={interval}&range={range_str}"
-                if _yf_crumb:
-                    url += f"&crumb={_yf_crumb}"
-                hdrs = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", "Accept": "application/json"}
-                r = (_yf_session or req).get(url, headers=hdrs, timeout=12)
-                if r.status_code == 429:
-                    print(f"429 on {host}")
-                    _yf_crumb = None
-                    _yf_session = None
-                    continue
-                if r.status_code != 200:
-                    continue
-                js = r.json()
-                res = js["chart"]["result"][0]
-                if "timestamp" not in res:
-                    continue
-                ts = res["timestamp"]
-                q = res["indicators"]["quote"][0]
-                bars = pd.DataFrame({
-                    "Open": q["open"], "High": q["high"],
-                    "Low": q["low"], "Close": q["close"],
-                    "Volume": q["volume"],
-                }, index=pd.to_datetime(ts, unit="s", utc=True)).dropna()
-                return bars.tail(n_bars) if len(bars) >= 5 else None
-            except Exception as e:
-                print(f"fetch_tf error ({interval}/{host}): {e}")
-        if attempt == 0:
-            get_yf_crumb()
-    return None
+    """Fetch bars using yfinance — handles cookies/crumbs automatically, no IP blocking."""
+    try:
+        period_map = {"2d":"2d","5d":"5d","30d":"1mo","6mo":"6mo","2y":"2y"}
+        period = period_map.get(range_str, "1mo")
+        df = yf.download("NQ=F", period=period, interval=interval,
+                         progress=False, auto_adjust=True)
+        if df is None or len(df) < 5:
+            return None
+        df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
+        df = df[["Open","High","Low","Close","Volume"]].dropna()
+        return df.tail(n_bars)
+    except Exception as e:
+        print(f"yfinance fetch_tf error ({interval}): {e}")
+        return None
 
 def fetch_all_timeframes():
     global last_htf_fetch, cached_htf
