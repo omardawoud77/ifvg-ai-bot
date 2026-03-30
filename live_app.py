@@ -101,23 +101,46 @@ TF_MAP = {
     "5m":      ("5m",  "2d"),
 }
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept": "application/json",
-    "Referer": "https://finance.yahoo.com",
-}
+_yf_session = None
+_yf_crumb = None
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept": "application/json",
-    "Referer": "https://finance.yahoo.com",
-}
+def get_yf_crumb():
+    global _yf_session, _yf_crumb
+    if _yf_crumb:
+        return _yf_session, _yf_crumb
+    try:
+        _yf_session = req.Session()
+        _yf_session.headers.update({
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate, br",
+        })
+        _yf_session.get("https://fc.yahoo.com", timeout=5)
+        r = _yf_session.get("https://query1.finance.yahoo.com/v1/test/getcrumb", timeout=5)
+        _yf_crumb = r.text.strip()
+        print(f"✅ Yahoo crumb obtained: {_yf_crumb[:8]}...")
+        return _yf_session, _yf_crumb
+    except Exception as e:
+        print(f"Crumb fetch failed: {e}")
+        _yf_session = None
+        _yf_crumb = None
+        return None, None
 
 def fetch_tf(interval, range_str, n_bars=100):
+    global _yf_crumb
+    session, crumb = get_yf_crumb()
     for host in ["query2", "query1"]:
         try:
-            url = f"https://{host}.finance.yahoo.com/v8/finance/chart/NQ=F?interval={interval}&range={range_str}"
-            r = req.get(url, headers=HEADERS, timeout=12)
+            url = f"https://{host}.finance.yahoo.com/v8/finance/chart/NQ=F"
+            params = {"interval": interval, "range": range_str}
+            if crumb:
+                params["crumb"] = crumb
+            r = (session or req).get(url, params=params, timeout=12)
+            if r.status_code == 429:
+                print(f"429 on {host} — resetting crumb")
+                _yf_crumb = None
+                continue
             if r.status_code != 200:
                 continue
             js = r.json()
@@ -125,10 +148,10 @@ def fetch_tf(interval, range_str, n_bars=100):
             if "timestamp" not in res:
                 continue
             ts = res["timestamp"]
-            q  = res["indicators"]["quote"][0]
+            q = res["indicators"]["quote"][0]
             bars = pd.DataFrame({
                 "Open": q["open"], "High": q["high"],
-                "Low":  q["low"],  "Close": q["close"],
+                "Low": q["low"], "Close": q["close"],
                 "Volume": q["volume"],
             }, index=pd.to_datetime(ts, unit="s", utc=True)).dropna()
             return bars.tail(n_bars) if len(bars) >= 5 else None
