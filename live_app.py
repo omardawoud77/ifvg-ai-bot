@@ -1532,7 +1532,18 @@ def close_trade():
         return jsonify({"ok": True})
     return jsonify({"ok": False})
 
+def background_loop():
+    """Background thread: fetch and score every INTERVAL seconds."""
+    while True:
+        try:
+            fetch_and_score()
+        except Exception as e:
+            print(f"Background loop error: {e}")
+        time.sleep(INTERVAL)
+
 if __name__ == "__main__":
+    t = threading.Thread(target=background_loop, daemon=True)
+    t.start()
     print("\n🤖 IFVG Live AI v7 — Full MTF ICT Framework")
     print("📊 Timeframes: Weekly → Daily → 4H → 1H → 15m → 5m")
     print("🎯 ICT: FVG + OB + Liquidity + Structure + Kill Zone")
