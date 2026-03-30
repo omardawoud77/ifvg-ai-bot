@@ -115,7 +115,7 @@ def fetch_tf(interval, range_str, n_bars=100):
         period_map = {"2d":"2d","5d":"5d","30d":"1mo","6mo":"6mo","2y":"2y"}
         period = period_map.get(range_str, "1mo")
         df = yf.download("NQ=F", period=period, interval=interval,
-                         progress=False, auto_adjust=True)
+                         progress=False, auto_adjust=True, timeout=30)
         if df is None or len(df) < 5:
             return None
         df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
@@ -1503,14 +1503,13 @@ def close_trade():
 
 def background_loop():
     """Background thread: fetch and score every INTERVAL seconds."""
-    print("⏳ Startup delay 60s — letting Railway IP settle...")
-    time.sleep(60)
+    print("🚀 Background loop starting immediately...")
     while True:
         try:
             fetch_and_score()
         except Exception as e:
-            print(f"Background loop error: {e} — sleeping 30s before retry")
-            time.sleep(30)
+            print(f"Background loop error: {e} — retrying in 15s")
+            time.sleep(15)
             continue
         time.sleep(INTERVAL)
 
