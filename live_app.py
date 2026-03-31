@@ -1672,6 +1672,9 @@ refresh(); setInterval(refresh,5000);
     <option value="15">15 min</option>
     <option value="30">30 min</option>
     <option value="60">60 min</option>
+    <option value="120">Rest of session (2h)</option>
+    <option value="480">Rest of day (8h)</option>
+    <option value="1440">Tomorrow (24h)</option>
   </select>
   <span id="pauseStatus" style="color:#f39c12;font-size:12px;font-weight:bold;"></span>
 </div>
