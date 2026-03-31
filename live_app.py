@@ -1052,6 +1052,12 @@ def fetch_and_score():
         final_score = max(0, min(100, base_score + ict_score))
 
         take  = final_score >= SCORE_THRESHOLD
+        # ── Kill zone gate — NO trades outside active sessions ──────────────
+        kz_name, kz_active = get_kill_zone()
+        if not kz_active:
+            state["last_update"] = et_str()
+            return  # skip everything, not in a kill zone
+
         alert = take and prev_score < SCORE_THRESHOLD
         alert_msg = ""
 
