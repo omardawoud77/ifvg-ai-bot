@@ -1622,23 +1622,7 @@ async function refresh() {
     } else { empty.style.display='block'; tbody.innerHTML=''; }
 
     document.getElementById('ut').textContent='Updated '+d.last_update;
-    // Update pause button state
-    const pauseBtn = document.getElementById('pauseBtn');
-    const pauseStatus = document.getElementById('pauseStatus');
-    if (d.trading_paused) {
-        pauseBtn.textContent = '▶ RESUME';
-        pauseBtn.style.background = '#27ae60';
-        if (d.pause_until) {
-            const secs = Math.max(0, Math.round(d.pause_until - Date.now()/1000));
-            pauseStatus.textContent = 'PAUSED — auto-resume in ' + secs + 's';
-        } else {
-            pauseStatus.textContent = 'PAUSED — manual resume required';
-        }
-    } else {
-        pauseBtn.textContent = '⏸ PAUSE';
-        pauseBtn.style.background = '#e74c3c';
-        pauseStatus.textContent = '';
-    }
+    updatePauseBtn(d);
   } catch(e){ console.error(e); }
 }
 
@@ -1664,28 +1648,66 @@ async function closeTrade(r){
 
 refresh(); setInterval(refresh,5000);
 </script>
-<div id="pausePanel" style="position:fixed;bottom:0;left:0;right:0;background:#1a1a2e;padding:8px 16px;display:flex;align-items:center;gap:10px;z-index:999;border-top:1px solid #333;">
-  <button id="pauseBtn" onclick="togglePause()" style="background:#e74c3c;color:white;border:none;padding:8px 18px;border-radius:6px;font-weight:bold;font-size:13px;cursor:pointer;">⏸ PAUSE</button>
-  <select id="pauseMins" style="background:#2a2a3e;color:white;border:1px solid #444;padding:6px 10px;border-radius:6px;font-size:13px;">
+<div id="pauseBtn" onclick="openPauseMenu()" style="position:fixed;bottom:20px;right:20px;background:#e74c3c;color:white;border:none;width:56px;height:56px;border-radius:50%;font-size:20px;cursor:pointer;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-weight:bold;">⏸</div>
+
+<div id="pauseOverlay" onclick="closePauseMenu()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;"></div>
+
+<div id="pauseModal" style="display:none;position:fixed;bottom:90px;right:20px;background:#1a1a2e;border:1px solid #333;border-radius:12px;padding:16px;z-index:1001;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,0.5);">
+  <div style="color:white;font-size:13px;font-weight:bold;margin-bottom:10px;text-align:center;">⏸ PAUSE TRADING</div>
+  <div id="pauseStatus" style="color:#f39c12;font-size:11px;text-align:center;margin-bottom:8px;"></div>
+  <select id="pauseMins" style="width:100%;background:#2a2a3e;color:white;border:1px solid #444;padding:8px;border-radius:6px;font-size:13px;margin-bottom:10px;">
     <option value="0">Manual resume</option>
-    <option value="5">5 min</option>
-    <option value="15">15 min</option>
-    <option value="30">30 min</option>
-    <option value="60">60 min</option>
+    <option value="5">5 minutes</option>
+    <option value="15">15 minutes</option>
+    <option value="30">30 minutes</option>
+    <option value="60">1 hour</option>
     <option value="120">Rest of session (2h)</option>
     <option value="480">Rest of day (8h)</option>
     <option value="1440">Tomorrow (24h)</option>
   </select>
-  <span id="pauseStatus" style="color:#f39c12;font-size:12px;font-weight:bold;"></span>
+  <button id="pauseConfirmBtn" onclick="confirmPause()" style="width:100%;background:#e74c3c;color:white;border:none;padding:10px;border-radius:6px;font-weight:bold;font-size:13px;cursor:pointer;">⏸ PAUSE NOW</button>
+  <button onclick="closePauseMenu()" style="width:100%;background:transparent;color:#888;border:1px solid #333;padding:8px;border-radius:6px;font-size:12px;cursor:pointer;margin-top:6px;">Cancel</button>
 </div>
+
 <script>
-function togglePause() {
+function openPauseMenu() {
+    const paused = document.getElementById('pauseBtn').dataset.paused === 'true';
+    if (paused) {
+        fetch('/resume', {method:'POST'}).then(()=>location.reload());
+        return;
+    }
+    document.getElementById('pauseModal').style.display = 'block';
+    document.getElementById('pauseOverlay').style.display = 'block';
+}
+function closePauseMenu() {
+    document.getElementById('pauseModal').style.display = 'none';
+    document.getElementById('pauseOverlay').style.display = 'none';
+}
+function confirmPause() {
+    const mins = parseInt(document.getElementById('pauseMins').value);
+    fetch('/pause', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({minutes:mins})})
+        .then(()=>{ closePauseMenu(); });
+}
+function updatePauseBtn(d) {
     const btn = document.getElementById('pauseBtn');
-    if (btn.textContent.includes('RESUME')) {
-        fetch('/resume', {method:'POST'}).then(()=>console.log('Resumed'));
+    const status = document.getElementById('pauseStatus');
+    if (!btn) return;
+    if (d.trading_paused) {
+        btn.textContent = '▶';
+        btn.style.background = '#27ae60';
+        btn.dataset.paused = 'true';
+        if (d.pause_until) {
+            const secs = Math.max(0, Math.round(d.pause_until - Date.now()/1000));
+            const mins = Math.floor(secs/60);
+            status.textContent = mins > 0 ? 'Paused — ' + mins + 'm left' : 'Paused — resuming...';
+        } else {
+            status.textContent = 'Paused — tap ▶ to resume';
+        }
     } else {
-        const mins = parseInt(document.getElementById('pauseMins').value);
-        fetch('/pause', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({minutes:mins})}).then(()=>console.log('Paused'));
+        btn.textContent = '⏸';
+        btn.style.background = '#e74c3c';
+        btn.dataset.paused = 'false';
+        status.textContent = '';
     }
 }
 </script>
