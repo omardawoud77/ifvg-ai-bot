@@ -85,18 +85,19 @@ def push_data_to_github():
         import subprocess
         subprocess.run(["git", "config", "user.email", "omardawoud2009@hotmail.com"], capture_output=True)
         subprocess.run(["git", "config", "user.name", "Omar"], capture_output=True)
-        subprocess.run(["git", "add", "live_trades.json", "model.pkl"], capture_output=True)
+        # Set token in remote URL first
+        token = os.environ.get("GIT_TOKEN", "")
+        if token:
+            subprocess.run(["git", "remote", "set-url", "origin",
+                f"https://{token}@github.com/omardawoud77/ifvg-ai-bot.git"],
+                capture_output=True)
+        subprocess.run(["git", "add", "live_trades.json", "lessons.json", "human_knowledge.json"], capture_output=True)
         result = subprocess.run(
             ["git", "commit", "-m", "auto: save trades + model"],
             capture_output=True, text=True
         )
         if "nothing to commit" in result.stdout:
             return
-        token = os.environ.get("GIT_TOKEN", "")
-        if token:
-            subprocess.run(["git", "remote", "set-url", "origin",
-                f"https://{token}@github.com/omardawoud77/ifvg-ai-bot.git"],
-                capture_output=True)
         subprocess.run(["git", "push"], capture_output=True)
         print("✅ Trades + model pushed to GitHub")
     except Exception as e:
