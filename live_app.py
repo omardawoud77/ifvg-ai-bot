@@ -1511,20 +1511,22 @@ h1 span{color:var(--green)}
   <div class="v-text" id="vt">LOADING...</div>
   <div class="v-dir" id="vd">Fetching MTF data...</div>
   <div class="score-breakdown">
-    <div class="score-box"><div class="score-lbl">BASE</div><div class="score-val blue" id="base-score">—</div></div>
-    <div class="score-box"><div class="score-lbl">ICT</div><div class="score-val purple" id="ict-score">—</div></div>
+    <div class="score-box"><div class="score-lbl">ICT SCORE</div><div class="score-val blue" id="base-score">0/7</div></div>
+    <div class="score-box" style="display:none"><div id="ict-score">0</div></div>
     <div class="score-box"><div class="score-lbl">FINAL</div><div class="score-val" id="final-score">—</div></div>
   </div>
   <div class="bar-wrap">
-    <div class="bar-label"><span>WIN PROBABILITY</span><span id="bp">—</span></div>
+    <div class="bar-label"><span>ICT CONFIDENCE</span><span id="bp">—</span></div>
     <div class="bar-track"><div class="bar-fill" id="bf" style="width:0%;background:var(--muted)"></div></div>
   </div>
 </div>
 
-<!-- Long/Short -->
-<div class="dual">
-  <div class="dual-card" id="lcard"><div class="dual-lbl">▲ LONG</div><div class="dual-val" id="lscore">—</div><div class="dual-sub">base score</div></div>
-  <div class="dual-card" id="scard"><div class="dual-lbl">▼ SHORT</div><div class="dual-val" id="sscore">—</div><div class="dual-sub">base score</div></div>
+<!-- ICT Conditions -->
+<div style="padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin:0 0 10px">
+  <div style="font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:6px">ICT CONDITIONS</div>
+  <div id="cond-grid" style="display:flex;flex-wrap:wrap;gap:4px">
+    <span style="color:var(--muted);font-size:11px">Loading...</span>
+  </div>
 </div>
 
 <!-- SL/TP -->
@@ -1681,23 +1683,30 @@ async function refresh() {
     document.getElementById('verdict').className='verdict '+(d.take?'take':'skip');
     document.getElementById('vt').textContent=d.take?'✅ TAKE':'❌ SKIP';
     document.getElementById('vd').textContent=d.direction+' · Final Score '+d.score+'%';
-    document.getElementById('base-score').textContent=(d.base_score||0)+'%';
-    const ics=d.ict_score||0;
-    document.getElementById('ict-score').textContent=(ics>=0?'+':'')+ics;
+    // ICT conditions display
+    const conds = d.ict_conditions || {};
+    const condNames = {
+        'htf_aligned': 'HTF', 'kill_zone': 'KZ', 'fvg_hit': 'FVG',
+        'ob_hit': 'OB', 'bos': 'BOS', 'volume_ok': 'VOL', 'liquidity_sweep': 'SWEEP'
+    };
+    const ictRaw = d.ict_score || 0;
+    document.getElementById('base-score').textContent = ictRaw + '/7';
+    document.getElementById('ict-score').textContent = '+' + ictRaw;
+    // Update condition badges if element exists
+    const condGrid = document.getElementById('cond-grid');
+    if (condGrid) {
+        condGrid.innerHTML = Object.entries(condNames).map(([k,label]) => {
+            const met = conds[k];
+            return '<span style="display:inline-block;margin:2px 3px;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold;background:'+(met?'#1a4a2e':'#4a1a1a')+';color:'+(met?'#4ade80':'#f87171')+'">'+label+(met?' ✓':' ✗')+'</span>';
+        }).join('');
+    }
     const fs=document.getElementById('final-score');
     fs.textContent=d.score+'%'; fs.style.color=d.take?'var(--green)':'var(--red)';
     const bf=document.getElementById('bf');
     document.getElementById('bp').textContent=d.score+'%';
     bf.style.width=d.score+'%'; bf.style.background=d.take?'var(--green)':'var(--red)';
 
-    // Scores
-    const ls=d.score_long||0,ss=d.score_short||0;
-    const lv=document.getElementById('lscore'),sv=document.getElementById('sscore');
-    lv.textContent=ls+'%'; sv.textContent=ss+'%';
-    lv.style.color=ls>=70?'var(--green)':ls>=55?'var(--amber)':'var(--red)';
-    sv.style.color=ss>=70?'var(--green)':ss>=55?'var(--amber)':'var(--red)';
-    document.getElementById('lcard').style.border=ls>=ss?'2px solid var(--green)':'1px solid var(--border)';
-    document.getElementById('scard').style.border=ss>ls?'2px solid var(--green)':'1px solid var(--border)';
+    // Scores (ICT conditions handled above)
 
     // SL/TP
     document.getElementById('sl-p').textContent=d.sl_price?d.sl_price.toLocaleString():'—';
