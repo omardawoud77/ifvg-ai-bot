@@ -102,6 +102,84 @@ def push_data_to_github():
     except Exception as e:
         print(f"⚠️  GitHub push failed: {e}")
 
+
+def ai_trade_filter(direction, price, score, long_score, short_score, 
+                    weekly, daily, h4, h1, m15, ict_factors, atr_val):
+    """Ask Claude API if this trade is worth taking."""
+    try:
+        import requests as _req
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if not api_key:
+            return True, "API key missing - defaulting to take"
+
+        # Skip if score gap too small
+        score_gap = abs(long_score - short_score)
+        if score_gap < 15:
+            return False, f"Score gap too small ({score_gap}pts) - skipping"
+
+        prompt = f"""You are an ICT trading analyst for NQ futures. 
+Analyze this potential {direction.upper()} trade and decide YES or NO.
+
+MARKET CONTEXT:
+- Price: {price}
+- Direction: {direction.upper()}
+- Long score: {long_score}%, Short score: {short_score}%
+- Score gap: {score_gap}pts
+- ATR: {atr_val:.1f}pts
+
+TIMEFRAME BIAS:
+- Weekly: {weekly}
+- Daily: {daily}  
+- 4H: {h4}
+- 1H: {h1}
+- 15m: {m15}
+
+ICT FACTORS: {', '.join(ict_factors) if ict_factors else 'none'}
+
+RULES - Respond NO if:
+- Score gap < 15 (already filtered but double check)
+- 3+ higher timeframes disagree with direction
+- Price in middle of range with no clear structure
+- Scores are close and setup is weak
+
+Respond with ONLY this format:
+DECISION: YES or NO
+REASON: one sentence max
+CONFIDENCE: 0-100"""
+
+        r = _req.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json"
+            },
+            json={
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 100,
+                "messages": [{"role": "user", "content": prompt}]
+            },
+            timeout=8
+        )
+
+        if r.status_code != 200:
+            print(f"⚠️  AI filter API error {r.status_code} - defaulting to take")
+            return True, "API error - default take"
+
+        text = r.json()["content"][0]["text"].strip()
+        print(f"🤖 AI: {text}")
+
+        decision = "YES" in text.split("\n")[0].upper()
+        reason = ""
+        for line in text.split("\n"):
+            if "REASON:" in line:
+                reason = line.replace("REASON:", "").strip()
+        return decision, reason
+
+    except Exception as e:
+        print(f"⚠️  AI filter error: {e} - defaulting to take")
+        return True, f"Error: {e}"
+
 def load_trades():
     if os.path.exists(TRADE_LOG):
         with open(TRADE_LOG) as f: return json.load(f)
@@ -987,6 +1065,27 @@ def fetch_and_score():
             else:
                 state["last_update"] = et_str()
                 return
+
+        if alert and not state.get("active_trade"):
+            # ── AI filter ────────────────────────────────────────────────────
+            ai_ok, ai_reason = ai_trade_filter(
+                direction=state.get("direction", ""),
+                price=price,
+                score=final_score,
+                long_score=state.get("base_score", 50),
+                short_score=100 - state.get("base_score", 50),
+                weekly=mtf.get("weekly","?"),
+                daily=mtf.get("daily","?"),
+                h4=mtf.get("4h","?"),
+                h1=mtf.get("1h","?"),
+                m15=mtf.get("15m","?"),
+                ict_factors=state.get("ict_factors", []),
+                atr_val=state.get("atr", 20.0)
+            )
+            state["ai_reason"] = ai_reason
+            if not ai_ok:
+                print(f"🤖 AI rejected trade: {ai_reason}")
+                alert = False
 
         if alert and not state.get("active_trade"):
             new_trade = {
