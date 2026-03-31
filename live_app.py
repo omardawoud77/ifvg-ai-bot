@@ -879,17 +879,39 @@ def fetch_and_score():
         atr_val   = float(last["atr"])       if not np.isnan(last["atr"])       else 10.0
         session   = get_kill_zone()[0]
         htf_bias  = "bullish" if ema_diff > 0 else "bearish"
-        sl_dist   = round(atr_val * 1.5, 1)
+        sl_dist   = round(max(20.0, min(40.0, atr_val * 0.7)), 1)  # tighter: 20-40 pts
 
         # Monitor active trade
         at = state.get("active_trade")
         if at and at["result"] == "open":
+            entry = at["entry"]
+            sl_gap = abs(entry - at["sl"])
+
             if at["direction"] == "long":
+                pnl_pts = price - entry
+                # Breakeven: move SL to entry+1 when +1R reached
+                if not at.get("breakeven") and pnl_pts >= sl_gap:
+                    at["sl"] = entry + 1.0
+                    at["breakeven"] = True
+                    print(f"🔒 Breakeven triggered — SL moved to {at['sl']}")
                 if cur_high >= at["tp"]:   _close_active("win",  at, price)
                 elif cur_low <= at["sl"]:  _close_active("loss", at, price)
             else:
+                pnl_pts = entry - price
+                # Breakeven: move SL to entry-1 when +1R reached
+                if not at.get("breakeven") and pnl_pts >= sl_gap:
+                    at["sl"] = entry - 1.0
+                    at["breakeven"] = True
+                    print(f"🔒 Breakeven triggered — SL moved to {at['sl']}")
                 if cur_low  <= at["tp"]:   _close_active("win",  at, price)
                 elif cur_high >= at["sl"]: _close_active("loss", at, price)
+
+            # Reversal exit: close in profit if HTF bias flips against trade
+            if at.get("result") == "open" and pnl_pts > 0:
+                expected_bias = "bullish" if at["direction"] == "long" else "bearish"
+                if htf_bias != expected_bias:
+                    print(f"🔄 Reversal detected — closing {at['direction']} at +{pnl_pts:.1f}pts")
+                    _close_active("reversal", at, price)
 
         # XGBoost base score (both directions)
         def mk_raw(d):
