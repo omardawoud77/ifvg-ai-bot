@@ -1489,6 +1489,23 @@ async function refresh() {
     } else { empty.style.display='block'; tbody.innerHTML=''; }
 
     document.getElementById('ut').textContent='Updated '+d.last_update;
+    // Update pause button state
+    const pauseBtn = document.getElementById('pauseBtn');
+    const pauseStatus = document.getElementById('pauseStatus');
+    if (d.trading_paused) {
+        pauseBtn.textContent = '▶ RESUME';
+        pauseBtn.style.background = '#27ae60';
+        if (d.pause_until) {
+            const secs = Math.max(0, Math.round(d.pause_until - Date.now()/1000));
+            pauseStatus.textContent = 'PAUSED — auto-resume in ' + secs + 's';
+        } else {
+            pauseStatus.textContent = 'PAUSED — manual resume required';
+        }
+    } else {
+        pauseBtn.textContent = '⏸ PAUSE';
+        pauseBtn.style.background = '#e74c3c';
+        pauseStatus.textContent = '';
+    }
   } catch(e){ console.error(e); }
 }
 
@@ -1513,7 +1530,30 @@ async function closeTrade(r){
 }
 
 refresh(); setInterval(refresh,5000);
-</script></body></html>"""
+</script>
+<div id="pausePanel" style="position:fixed;bottom:0;left:0;right:0;background:#1a1a2e;padding:8px 16px;display:flex;align-items:center;gap:10px;z-index:999;border-top:1px solid #333;">
+  <button id="pauseBtn" onclick="togglePause()" style="background:#e74c3c;color:white;border:none;padding:8px 18px;border-radius:6px;font-weight:bold;font-size:13px;cursor:pointer;">⏸ PAUSE</button>
+  <select id="pauseMins" style="background:#2a2a3e;color:white;border:1px solid #444;padding:6px 10px;border-radius:6px;font-size:13px;">
+    <option value="0">Manual resume</option>
+    <option value="5">5 min</option>
+    <option value="15">15 min</option>
+    <option value="30">30 min</option>
+    <option value="60">60 min</option>
+  </select>
+  <span id="pauseStatus" style="color:#f39c12;font-size:12px;font-weight:bold;"></span>
+</div>
+<script>
+function togglePause() {
+    const btn = document.getElementById('pauseBtn');
+    if (btn.textContent.includes('RESUME')) {
+        fetch('/resume', {method:'POST'}).then(()=>console.log('Resumed'));
+    } else {
+        const mins = parseInt(document.getElementById('pauseMins').value);
+        fetch('/pause', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({minutes:mins})}).then(()=>console.log('Paused'));
+    }
+}
+</script>
+</body></html>"""
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.route("/")
