@@ -103,6 +103,22 @@ def push_data_to_github():
         print(f"⚠️  GitHub push failed: {e}")
 
 
+def load_lessons_summary():
+    """Load recent lessons for AI context."""
+    try:
+        import json
+        with open("lessons.json") as f:
+            data = json.load(f)
+        lessons = data.get("lessons", [])[-10:]  # last 10 lessons
+        if not lessons:
+            return "No lessons yet — first trades being analyzed."
+        summary = []
+        for l in lessons:
+            summary.append(f"- [{l.get('trade_result','?').upper()}] {l.get('lesson','')}")
+        return "\n".join(summary)
+    except:
+        return "No lessons available."
+
 def ai_trade_filter(direction, price, score, long_score, short_score, 
                     weekly, daily, h4, h1, m15, ict_factors, atr_val):
     """Ask Claude API if this trade is worth taking."""
@@ -136,17 +152,30 @@ TIMEFRAME BIAS:
 
 ICT FACTORS: {', '.join(ict_factors) if ict_factors else 'none'}
 
+TRADER HISTORICAL EDGE (160 real trades):
+- Overall win rate: 64%
+- Hour 17:00-18:00 Cairo = 70% WR (BEST)
+- Hour 19:00 Cairo = 53% WR (AVOID)
+- Both directions work equally
+- All edge is in NY open kill zone
+
+BOT LESSONS LEARNED:
+{lessons_summary}
+
 RULES - Respond NO if:
-- Score gap < 15 (already filtered but double check)
 - 3+ higher timeframes disagree with direction
-- Price in middle of range with no clear structure
-- Scores are close and setup is weak
+- Current hour is 19:00 Cairo (low WR historically)
+- Setup is weak or unclear
+- Recent lessons warn against this pattern
 
 Respond with ONLY this format:
 DECISION: YES or NO
 REASON: one sentence max
 CONFIDENCE: 0-100"""
 
+        lessons_summary = load_lessons_summary()
+        prompt = prompt.replace("{lessons_summary}", lessons_summary)
+        
         r = _req.post(
             "https://api.anthropic.com/v1/messages",
             headers={
@@ -179,6 +208,116 @@ CONFIDENCE: 0-100"""
     except Exception as e:
         print(f"⚠️  AI filter error: {e} - defaulting to take")
         return True, f"Error: {e}"
+
+
+def learn_from_trade(trade):
+    """After trade closes, ask Claude what we can learn. Store lesson."""
+    try:
+        import requests as _req, json, os
+        from datetime import datetime
+        
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if not api_key:
+            return
+        
+        # Load existing lessons
+        try:
+            with open("lessons.json") as f:
+                lessons_data = json.load(f)
+        except:
+            lessons_data = {"version": 1, "total_lessons": 0, "lessons": [], "patterns": {}}
+        
+        # Load human knowledge
+        try:
+            with open("human_knowledge.json") as f:
+                hk = json.load(f)
+        except:
+            hk = {}
+        
+        result = trade.get("result", "unknown")
+        ict_conds = trade.get("ict_conditions", {})
+        conds_met = [k for k, v in ict_conds.items() if v]
+        conds_failed = [k for k, v in ict_conds.items() if not v]
+        
+        # Entry hour in Cairo time
+        try:
+            entry_hour = int(trade.get("time", "00:00")[-8:-6])
+        except:
+            entry_hour = 0
+        
+        prompt = f"""You are analyzing a completed NQ futures trade to extract a trading lesson.
+
+TRADE RESULT: {result.upper()}
+Direction: {trade.get("direction", "?")}
+Entry: {trade.get("entry", "?")}
+PnL: {trade.get("pnl_pts", "?")} pts (${trade.get("pnl_usd", "?")})
+Session: {trade.get("session", "?")}
+Hour (Cairo): {entry_hour}:00
+HTF Bias: {trade.get("htf_bias", "?")}
+
+ICT CONDITIONS MET: {conds_met}
+ICT CONDITIONS FAILED: {conds_failed}
+
+TRADER'S HISTORICAL CONTEXT (160 manual trades):
+- Overall win rate: {hk.get("win_rate", 64)}%
+- Hour 17:00 Cairo: 70% WR
+- Hour 18:00 Cairo: 70% WR  
+- Hour 19:00 Cairo: 53% WR (avoid)
+- Best session: NY open
+
+RECENT BOT LESSONS:
+{json.dumps(lessons_data["lessons"][-5:], indent=2) if lessons_data["lessons"] else "No lessons yet"}
+
+Based on this trade, extract ONE specific lesson the bot should remember.
+Focus on: which conditions actually mattered, timing patterns, what to do differently.
+
+Respond in this exact JSON format:
+{{"lesson": "one clear sentence about what this trade teaches", "pattern": "condition_combo_or_timing", "action": "take_more" or "take_less" or "adjust_timing", "confidence": 0-100}}
+Only respond with the JSON, nothing else."""
+
+        r = _req.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 200,
+                  "messages": [{"role": "user", "content": prompt}]},
+            timeout=10
+        )
+        
+        if r.status_code != 200:
+            return
+            
+        text = r.json()["content"][0]["text"].strip()
+        lesson = json.loads(text)
+        lesson["trade_result"] = result
+        lesson["trade_time"] = trade.get("time", "")
+        lesson["session"] = trade.get("session", "")
+        lesson["conditions_met"] = conds_met
+        
+        lessons_data["lessons"].append(lesson)
+        lessons_data["total_lessons"] = len(lessons_data["lessons"])
+        
+        # Update patterns
+        pattern_key = lesson.get("pattern", "unknown")
+        if pattern_key not in lessons_data["patterns"]:
+            lessons_data["patterns"][pattern_key] = {"wins": 0, "losses": 0}
+        if result == "win":
+            lessons_data["patterns"][pattern_key]["wins"] += 1
+        else:
+            lessons_data["patterns"][pattern_key]["losses"] += 1
+        
+        with open("lessons.json", "w") as f:
+            json.dump(lessons_data, f, indent=2)
+        
+        print(f"\U0001f9e0 Lesson learned: {lesson.get('lesson', '')}")
+        
+        # Push to GitHub
+        threading.Thread(target=lambda: __import__("subprocess").run(
+            ["git", "add", "lessons.json", "human_knowledge.json"],
+            capture_output=True
+        ), daemon=True).start()
+        
+    except Exception as e:
+        print(f"\u26a0\ufe0f Learn error: {e}")
 
 def load_trades():
     if os.path.exists(TRADE_LOG):
@@ -1047,6 +1186,7 @@ def _close_active(result, at, price):
     at["pnl_usd"]    = round(at["pnl_pts"] * MNQ_PTS_TO_USD, 2)
     trades = load_trades(); trades.append(at); save_trades(trades)
     threading.Thread(target=push_data_to_github, daemon=True).start()
+    threading.Thread(target=learn_from_trade, args=(at,), daemon=True).start()
     state["active_trade"] = None
     print(f"🏁 {result.upper()} {at['pnl_pts']:+.1f}pts (${at['pnl_usd']:+.2f}) [{at.get('trade_type','—')}]")
     retrain_model_async(at)

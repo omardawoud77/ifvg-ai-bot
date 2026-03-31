@@ -1,0 +1,49 @@
+{
+  "total_trades": 160,
+  "win_rate": 64.4,
+  "total_pnl": 1711.5,
+  "by_hour": {
+    "17": {
+      "trades": 30,
+      "wins": 21,
+      "wr": 70
+    },
+    "18": {
+      "trades": 76,
+      "wins": 53,
+      "wr": 70
+    },
+    "19": {
+      "trades": 49,
+      "wins": 26,
+      "wr": 53
+    },
+    "20": {
+      "trades": 4,
+      "wins": 3,
+      "wr": 75
+    }
+  },
+  "by_direction": {
+    "short": {
+      "trades": 88,
+      "wins": 56,
+      "wr": 64
+    },
+    "long": {
+      "trades": 72,
+      "wins": 47,
+      "wr": 65
+    }
+  },
+  "best_session": "NY_open",
+  "best_hours": [
+    17,
+    18,
+    20
+  ],
+  "avoid_hours": [
+    19
+  ],
+  "notes": "Omar trades MNQ NY open session. Best performance 17:00-18:00 Cairo (13:00-14:00 UTC). Win rate drops significantly after 19:00 Cairo. Both long and short perform similarly. Almost all profitable trades in NY open kill zone."
+}
