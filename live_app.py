@@ -92,6 +92,11 @@ def push_data_to_github():
         )
         if "nothing to commit" in result.stdout:
             return
+        token = os.environ.get("GIT_TOKEN", "")
+        if token:
+            subprocess.run(["git", "remote", "set-url", "origin",
+                f"https://{token}@github.com/omardawoud77/ifvg-ai-bot.git"],
+                capture_output=True)
         subprocess.run(["git", "push"], capture_output=True)
         print("✅ Trades + model pushed to GitHub")
     except Exception as e:
