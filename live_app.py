@@ -164,7 +164,9 @@ BOT LESSONS LEARNED:
 
 RULES - Respond NO if:
 - 3+ higher timeframes disagree with direction
-- Current hour is 19:00 Cairo (low WR historically)
+- HTF bias conflicts with direction across 3+ timeframes
+- Volume is extremely low (below 0.5x average)
+- No FVG or OB present at all
 - Setup is weak or unclear
 - Recent lessons warn against this pattern
 
@@ -263,7 +265,11 @@ TRADER'S HISTORICAL CONTEXT (160 manual trades):
 - Hour 17:00 Cairo: 70% WR
 - Hour 18:00 Cairo: 70% WR  
 - Hour 19:00 Cairo: 53% WR (avoid)
-- Best session: NY open
+- NY open (17-18 Cairo): 70% WR — best session
+- NY open (19 Cairo): 53% WR — weaker
+- London open: unknown for bot (learning now)
+- Asia: unknown for bot (learning now)
+- Goal: learn which sessions work for THIS bot
 
 RECENT BOT LESSONS:
 {json.dumps(lessons_data["lessons"][-5:], indent=2) if lessons_data["lessons"] else "No lessons yet"}
@@ -667,9 +673,9 @@ def get_kill_zone():
 
     # Asia:         8:00 PM - 2:00 AM ET = 00:00-06:00 UTC = 0-360 mins
     if mins < 360 or mins >= 1380:
-        return "asia", False
+        return "asia", True   # enabled for learning
 
-    return "transition", False
+    return "transition", True   # all hours active for learning
 
 # ── Full MTF ICT Analysis ─────────────────────────────────────────────────────
 
@@ -1280,7 +1286,7 @@ def fetch_and_score():
         final_score = round(ict_s / 7 * 100)
 
         # Take trade if score >= 5/7 AND kill zone active
-        ICT_THRESHOLD = 5
+        ICT_THRESHOLD = 4  # lowered for max learning exposure
         alert = (ict_s >= ICT_THRESHOLD) and kz_active and not state.get("active_trade")
         alert_msg = ""
 
