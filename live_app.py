@@ -65,6 +65,7 @@ state = {
     "ict_factors": [],
     "trade_type": "—",
     "alert": False, "alert_msg": "",
+    "trading_paused": False, "pause_until": None,
     "total_trades": 0, "wins": 0, "losses": 0, "win_rate": 0,
     "total_pnl_usd": 0.0,
     "active_trade": None,
@@ -942,6 +943,17 @@ def fetch_and_score():
         alert = take and prev_score < SCORE_THRESHOLD
         alert_msg = ""
 
+        # ── Pause check ─────────────────────────────────────────────────────
+        if state.get("trading_paused"):
+            pu = state.get("pause_until")
+            if pu and time.time() > pu:
+                state["trading_paused"] = False
+                state["pause_until"] = None
+                print("▶️  Auto-resume after countdown")
+            else:
+                state["last_update"] = et_str()
+                return
+
         if alert and not state.get("active_trade"):
             new_trade = {
                 "time": et_str("%Y-%m-%d %H:%M:%S"),
@@ -1508,6 +1520,24 @@ refresh(); setInterval(refresh,5000);
 def index():
     fetch_and_score()
     return render_template_string(HTML)
+
+
+@app.route("/pause", methods=["POST"])
+def pause_trading():
+    data = request.get_json() or {}
+    minutes = int(data.get("minutes", 0))
+    state["trading_paused"] = True
+    state["pause_until"] = time.time() + (minutes * 60) if minutes > 0 else None
+    msg = f"paused for {minutes}min" if minutes > 0 else "paused (manual resume)"
+    print(f"⏸️  Trading {msg}")
+    return jsonify({"status": "paused", "minutes": minutes})
+
+@app.route("/resume", methods=["POST"])
+def resume_trading():
+    state["trading_paused"] = False
+    state["pause_until"] = None
+    print("▶️  Trading RESUMED")
+    return jsonify({"status": "resumed"})
 
 @app.route("/state")
 def get_state():
