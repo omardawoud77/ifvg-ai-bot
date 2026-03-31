@@ -534,6 +534,99 @@ def get_kill_zone():
 
 # ── Full MTF ICT Analysis ─────────────────────────────────────────────────────
 
+
+def ict_score(df, direction, mtf, kz_active):
+    """Pure ICT rule-based scoring. Returns (score 0-6, conditions dict)."""
+    conds = {}
+    
+    if len(df) < 20:
+        return 0, conds
+    
+    last   = df.iloc[-1]
+    prev   = df.iloc[-2]
+    recent = df.tail(20)
+    
+    close  = float(last['close'])
+    high   = float(last['high'])
+    low    = float(last['low'])
+    volume = float(last.get('volume', 0))
+    avg_vol = float(recent['volume'].mean()) if 'volume' in df.columns else 0
+    
+    # 1. HTF Bias — Weekly + Daily + 4H must all agree
+    weekly = mtf.get('weekly', '')
+    daily  = mtf.get('daily', '')
+    h4     = mtf.get('4h', '')
+    
+    if direction == 'long':
+        htf_ok = (weekly == 'bullish' and daily == 'bullish' and h4 == 'bullish')
+    else:
+        htf_ok = (weekly == 'bearish' and daily == 'bearish' and h4 == 'bearish')
+    conds['htf_aligned'] = htf_ok
+    
+    # 2. Kill zone active
+    conds['kill_zone'] = kz_active
+    
+    # 3. FVG — check if recent price is inside an unfilled gap
+    fvg_hit = False
+    for i in range(2, min(15, len(df))):
+        c1 = df.iloc[-i-1]
+        c2 = df.iloc[-i]
+        c3 = df.iloc[-i+1] if i > 1 else last
+        gap_low  = float(c1['high'])
+        gap_high = float(c3['low'])
+        if gap_high > gap_low:  # bullish FVG
+            if direction == 'long' and gap_low <= close <= gap_high:
+                fvg_hit = True; break
+        gap_low2  = float(c3['high'])
+        gap_high2 = float(c1['low'])
+        if gap_high2 < gap_low2:  # bearish FVG
+            if direction == 'short' and gap_high2 <= close <= gap_low2:
+                fvg_hit = True; break
+    conds['fvg_hit'] = fvg_hit
+    
+    # 4. Order Block — large candle in opposite direction before move
+    ob_hit = False
+    for i in range(3, min(20, len(df))):
+        bar = df.iloc[-i]
+        bar_range = float(bar['high']) - float(bar['low'])
+        avg_range = float((df.tail(20)['high'] - df.tail(20)['low']).mean())
+        if bar_range > avg_range * 1.5:  # significant candle
+            ob_high = float(bar['high'])
+            ob_low  = float(bar['low'])
+            if direction == 'long' and ob_low <= close <= ob_high:
+                ob_hit = True; break
+            if direction == 'short' and ob_low <= close <= ob_high:
+                ob_hit = True; break
+    conds['ob_hit'] = ob_hit
+    
+    # 5. Structure break (BOS) — recent swing broken
+    swing_highs = df.tail(10)['high']
+    swing_lows  = df.tail(10)['low']
+    if direction == 'long':
+        bos = close > float(swing_highs.iloc[-5:-1].max())
+    else:
+        bos = close < float(swing_lows.iloc[-5:-1].min())
+    conds['bos'] = bos
+    
+    # 6. Volume — above average
+    vol_ok = (avg_vol > 0 and volume > avg_vol * 1.2)
+    conds['volume_ok'] = vol_ok
+    
+    # 7. Liquidity sweep — recent high/low taken then reversed
+    sweep = False
+    if direction == 'long':
+        recent_low = float(df.tail(5)['low'].min())
+        if float(df.iloc[-2]['low']) < recent_low and close > float(df.iloc[-2]['low']):
+            sweep = True
+    else:
+        recent_high = float(df.tail(5)['high'].max())
+        if float(df.iloc[-2]['high']) > recent_high and close < float(df.iloc[-2]['high']):
+            sweep = True
+    conds['liquidity_sweep'] = sweep
+    
+    score = sum(1 for v in conds.values() if v)
+    return score, conds
+
 def run_ict_analysis(all_bars, direction, price_now):
     """
     Run full ICT analysis across all timeframes.
@@ -1026,38 +1119,29 @@ def fetch_and_score():
                     print(f"🔄 Reversal detected — closing {at['direction']} at +{pnl_pts:.1f}pts")
                     _close_active("reversal", at, price)
 
-        # XGBoost base score (both directions)
-        def mk_raw(d):
-            return {"timeframe":"1H", "rsi_at_entry":round(rsi_val,1),
-                    "ema_diff":round(ema_diff,1), "volume_ratio":round(vol_ratio,2),
-                    "session":session, "htf_bias":htf_bias, "trade_direction":d,
-                    "sl_distance_points":sl_dist, "entry_price":round(price,2)}
-
-        prob_long  = float(model.predict_proba(engineer(mk_raw("long")))[0,1])
-        prob_short = float(model.predict_proba(engineer(mk_raw("short")))[0,1])
-        sl_long    = int(round(prob_long  * 100))
-        ss_short   = int(round(prob_short * 100))
-
-        if sl_long >= ss_short:
-            direction="long";  base_score=sl_long;  prob=prob_long;  raw=mk_raw("long")
-            sl_price=round(price-sl_dist,2);   tp_price=round(price+sl_dist*RR,2)
-        else:
-            direction="short"; base_score=ss_short; prob=prob_short; raw=mk_raw("short")
-            sl_price=round(price+sl_dist,2);   tp_price=round(price-sl_dist*RR,2)
-
-        # ICT layer
-        ict_score, ict_factors, trade_type, mtf = run_ict_analysis(all_bars, direction, price)
-
-        # Combined final score
-        final_score = max(0, min(100, base_score + ict_score))
-
-        take  = final_score >= SCORE_THRESHOLD
-        alert = take and prev_score < SCORE_THRESHOLD
-
-        # ── Kill zone gate — block entry only, not the whole loop ────────────
+        # ── Pure ICT scoring (replaces XGBoost) ────────────────────────────
         kz_name, kz_active = get_kill_zone()
-        if not kz_active:
-            alert = False  # no entries outside kill zones
+        direction = "long" if ema_diff > 0 else "short"
+
+        if direction == "long":
+            sl_price = round(price - sl_dist, 2)
+            tp_price = round(price + sl_dist * RR, 2)
+        else:
+            sl_price = round(price + sl_dist, 2)
+            tp_price = round(price - sl_dist * RR, 2)
+
+        # Run ICT analysis (multi-timeframe structure)
+        ict_addon, ict_factors, trade_type, mtf = run_ict_analysis(all_bars, direction, price)
+
+        # Run pure ICT score (7 binary conditions)
+        bars_5m_renamed = bars_5m.rename(columns={c: c.lower() for c in bars_5m.columns})
+        ict_s, ict_conds = ict_score(bars_5m_renamed, direction, mtf, kz_active)
+
+        final_score = round(ict_s / 7 * 100)
+
+        # Take trade if score >= 5/7 AND kill zone active
+        ICT_THRESHOLD = 5
+        alert = (ict_s >= ICT_THRESHOLD) and kz_active and not state.get("active_trade")
         alert_msg = ""
 
         # ── Pause check ─────────────────────────────────────────────────────
@@ -1071,14 +1155,14 @@ def fetch_and_score():
                 state["last_update"] = et_str()
                 return
 
-        if alert and not state.get("active_trade"):
+        if alert:
             # ── AI filter ────────────────────────────────────────────────────
             ai_ok, ai_reason = ai_trade_filter(
                 direction=state.get("direction", ""),
                 price=price,
                 score=final_score,
-                long_score=state.get("base_score", 50),
-                short_score=100 - state.get("base_score", 50),
+                long_score=final_score if direction == "long" else 0,
+                short_score=final_score if direction == "short" else 0,
                 weekly=mtf.get("weekly","?"),
                 daily=mtf.get("daily","?"),
                 h4=mtf.get("4h","?"),
@@ -1097,7 +1181,7 @@ def fetch_and_score():
                 "time": et_str("%Y-%m-%d %H:%M:%S"),
                 "direction": direction, "entry": price,
                 "sl": sl_price, "tp": tp_price,
-                "score": final_score, "base_score": base_score, "ict_score": ict_score,
+                "score": final_score, "ict_raw": ict_s, "ict_conditions": ict_conds,
                 "session": session, "htf_bias": htf_bias,
                 "rsi_at_entry": round(rsi_val,1), "ema_diff": round(ema_diff,1),
                 "volume_ratio": round(vol_ratio,2),
@@ -1106,7 +1190,7 @@ def fetch_and_score():
                 "exit_time": None, "pnl_pts": None, "pnl_usd": None,
             }
             state["active_trade"] = new_trade
-            alert_msg = f"AUTO [{trade_type.upper()}]: {direction.upper()} @ {price:,.1f} | Score:{final_score}% (Base:{base_score}+ICT:{ict_score:+d})"
+            alert_msg = f"AUTO [{trade_type.upper()}]: {direction.upper()} @ {price:,.1f} | ICT:{ict_s}/7 ({final_score}%)"
             print(f"🤖 {alert_msg}")
 
         prev_score = final_score
@@ -1114,16 +1198,14 @@ def fetch_and_score():
         stats  = calc_stats(trades)
 
         state.update({
-            "score": final_score, "base_score": base_score, "ict_score": ict_score,
-            "prob": round(prob,3), "take": take, "direction": direction.upper(),
-            "score_long": sl_long, "score_short": ss_short,
+            "score": final_score, "base_score": final_score, "ict_score": ict_s,
+            "ict_conditions": ict_conds, "direction": direction.upper(),
             "rsi": round(rsi_val,1), "ema_diff": round(ema_diff,1),
             "vol_ratio": round(vol_ratio,2), "session": session,
             "htf_bias": htf_bias, "sl_dist": sl_dist,
             "price": round(price,2), "sl_price": sl_price, "tp_price": tp_price,
             "last_update": et_str(),
-            "error": None, "factors": get_base_factors(raw),
-            "ict_factors": ict_factors, "trade_type": trade_type,
+            "error": None, "ict_factors": ict_factors, "trade_type": trade_type,
             "alert": alert, "alert_msg": alert_msg,
             "total_trades": stats["total"], "wins": stats["wins"],
             "losses": stats["losses"], "win_rate": stats["win_rate"],
@@ -1131,7 +1213,7 @@ def fetch_and_score():
             "trades": trades, "stats": stats, "mtf": mtf,
         })
 
-        print(f"[v7] {direction.upper()} base={base_score} ict={ict_score:+d} final={final_score} type={trade_type} price={price}")
+        print(f"[v8-ICT] {direction.upper()} ict={ict_s}/7 ({final_score}%) type={trade_type} price={price}")
 
     except Exception as e:
         import traceback
