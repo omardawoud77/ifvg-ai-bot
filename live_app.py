@@ -78,6 +78,25 @@ state = {
 prev_score = 0
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+def push_data_to_github():
+    """Push trade log and model to GitHub so they survive redeployments."""
+    try:
+        import subprocess
+        subprocess.run(["git", "config", "user.email", "omardawoud2009@hotmail.com"], capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Omar"], capture_output=True)
+        subprocess.run(["git", "add", "live_trades.json", "model.pkl"], capture_output=True)
+        result = subprocess.run(
+            ["git", "commit", "-m", "auto: save trades + model"],
+            capture_output=True, text=True
+        )
+        if "nothing to commit" in result.stdout:
+            return
+        subprocess.run(["git", "push"], capture_output=True)
+        print("✅ Trades + model pushed to GitHub")
+    except Exception as e:
+        print(f"⚠️  GitHub push failed: {e}")
+
 def load_trades():
     if os.path.exists(TRADE_LOG):
         with open(TRADE_LOG) as f: return json.load(f)
@@ -85,6 +104,15 @@ def load_trades():
 
 def save_trades(t):
     with open(TRADE_LOG, "w") as f: json.dump(t, f, indent=2)
+
+# ── Restore trade history on startup ─────────────────────────────────────────
+_closed = load_trades()
+state["total_trades"] = len(_closed)
+state["wins"]   = sum(1 for t in _closed if t.get("result") == "win")
+state["losses"] = sum(1 for t in _closed if t.get("result") == "loss")
+state["win_rate"] = round(state["wins"] / state["total_trades"] * 100, 1) if state["total_trades"] > 0 else 0
+state["total_pnl_usd"] = round(sum(t.get("pnl_usd", 0) for t in _closed), 2)
+print(f"📂 Loaded {state['total_trades']} trades from history")
 
 # ── Indicators ────────────────────────────────────────────────────────────────
 def calc_ema(s, p): return s.ewm(span=p, adjust=False).mean()
@@ -842,6 +870,7 @@ def _close_active(result, at, price):
     at["pnl_pts"]    = round(abs(at["tp"]-at["entry"]),1) if result=="win" else round(-abs(at["sl"]-at["entry"]),1)
     at["pnl_usd"]    = round(at["pnl_pts"] * MNQ_PTS_TO_USD, 2)
     trades = load_trades(); trades.append(at); save_trades(trades)
+    threading.Thread(target=push_data_to_github, daemon=True).start()
     state["active_trade"] = None
     print(f"🏁 {result.upper()} {at['pnl_pts']:+.1f}pts (${at['pnl_usd']:+.2f}) [{at.get('trade_type','—')}]")
     retrain_model_async(at)
