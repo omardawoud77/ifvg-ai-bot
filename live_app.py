@@ -1301,7 +1301,8 @@ def fetch_and_score():
         # Daily limit — max 5 trades per day
         from datetime import datetime as _dt
         today = _dt.now().strftime("%Y-%m-%d")
-        daily_trades = sum(1 for t in trades if t.get("time","")[:10] == today)
+        _all_trades = load_trades()
+        daily_trades = sum(1 for t in _all_trades if t.get("time","")[:10] == today)
         daily_ok = daily_trades < 5
         
         alert = (ict_s >= ICT_THRESHOLD) and kz_active and not state.get("active_trade") and htf_ok and has_setup and cooldown_ok and daily_ok
