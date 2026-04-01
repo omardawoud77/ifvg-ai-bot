@@ -657,7 +657,7 @@ def get_kill_zone():
 
     # London open:  2:00-5:00 AM ET  = 06:00-09:00 UTC = 360-540 mins
     if 360 <= mins < 540:
-        return "london_open", True
+        return "london_open", False  # v2: blocked — 28-42% WR drag
 
     # NY open:      9:30-11:00 AM ET = 13:30-15:00 UTC = 810-900 mins
     if 810 <= mins < 900:
