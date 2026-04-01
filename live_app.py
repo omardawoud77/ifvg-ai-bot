@@ -2000,7 +2000,18 @@ def resume_trading():
 @app.route("/state")
 def get_state():
     fetch_and_score()
-    return jsonify(state)
+    import numpy as np
+    def sanitize(obj):
+        if isinstance(obj, dict):
+            return {k: sanitize(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [sanitize(i) for i in obj]
+        elif isinstance(obj, (np.bool_, np.integer)):
+            return obj.item()
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        return obj
+    return jsonify(sanitize(state))
 
 @app.route("/close_trade", methods=["POST"])
 def close_trade():
