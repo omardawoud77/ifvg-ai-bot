@@ -676,7 +676,7 @@ def get_kill_zone():
     if mins < 360 or mins >= 1380:
         return "asia", True   # enabled for learning
 
-    return "transition", True   # all hours active for learning
+    return "transition", False  # block between sessions
 
 # ── Full MTF ICT Analysis ─────────────────────────────────────────────────────
 
@@ -1195,6 +1195,7 @@ def _close_active(result, at, price):
     threading.Thread(target=push_data_to_github, daemon=True).start()
     threading.Thread(target=learn_from_trade, args=(at,), daemon=True).start()
     state["active_trade"] = None
+    state["last_trade_close_time"] = __import__("time").time()
     print(f"🏁 {result.upper()} {at['pnl_pts']:+.1f}pts (${at['pnl_usd']:+.2f}) [{at.get('trade_type','—')}]")
     retrain_model_async(at)
 
@@ -1287,8 +1288,23 @@ def fetch_and_score():
         final_score = round(ict_s / 7 * 100)
 
         # Take trade if score >= 5/7 AND kill zone active
-        ICT_THRESHOLD = 4  # lowered for max learning exposure
-        alert = (ict_s >= ICT_THRESHOLD) and kz_active and not state.get("active_trade")
+        ICT_THRESHOLD = 5  # raised back to quality threshold
+        # Quality filters
+        htf_ok = ict_conds.get("htf_aligned", False)
+        has_setup = (trade_type != "no_setup")
+        
+        # Cooldown — 30 min after last trade
+        import time as _time
+        last_trade_time = state.get("last_trade_close_time", 0)
+        cooldown_ok = (_time.time() - last_trade_time) > 1800  # 30 min
+        
+        # Daily limit — max 5 trades per day
+        from datetime import datetime as _dt
+        today = _dt.now().strftime("%Y-%m-%d")
+        daily_trades = sum(1 for t in trades if t.get("time","")[:10] == today)
+        daily_ok = daily_trades < 5
+        
+        alert = (ict_s >= ICT_THRESHOLD) and kz_active and not state.get("active_trade") and htf_ok and has_setup and cooldown_ok and daily_ok
         alert_msg = ""
 
         # ── Pause check ─────────────────────────────────────────────────────
