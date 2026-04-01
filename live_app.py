@@ -674,7 +674,7 @@ def get_kill_zone():
 
     # Asia:         8:00 PM - 2:00 AM ET = 00:00-06:00 UTC = 0-360 mins
     if mins < 360 or mins >= 1380:
-        return "asia", True   # enabled for learning
+        return "asia", False  # v2: Asia blocked
 
     return "transition", False  # block between sessions
 
@@ -755,7 +755,7 @@ def ict_score(df, direction, mtf, kz_active):
     conds['bos'] = bos
     
     # 6. Volume — above average
-    vol_ok = (avg_vol > 0 and volume > avg_vol * 1.2)
+    vol_ok = (avg_vol > 0 and volume > avg_vol * 1.5)  # v2: 1.5x spike required
     conds['volume_ok'] = vol_ok
     
     # 7. Liquidity sweep — recent high/low taken then reversed
