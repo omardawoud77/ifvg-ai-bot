@@ -36,7 +36,7 @@ BUFFER_SIZE      = 2000    # bars kept in replay memory
 MIN_BARS_TRAIN   = 400     # minimum bars before first training
 RETRAIN_EVERY    = 50      # retrain every N new bars
 CHECKPOINT_EVERY = 100     # save model every N bars
-FETCH_INTERVAL   = 300     # seconds between bar fetches (5 min)
+FETCH_INTERVAL   = 15      # seconds between bar fetches (15s)
 MODEL_PATH       = "rl_live_agent.zip"
 BUFFER_PATH      = "rl_live_buffer.pkl"
 LOG_PATH         = "rl_live_agent.log"
@@ -106,7 +106,7 @@ class LiveAgentState:
 def fetch_latest_bars(n=300):
     """Fetch latest N 5m bars from Yahoo Finance."""
     try:
-        df = yf.download("NQ=F", period="5d", interval="5m",
+        df = yf.download("NQ=F", period="7d", interval="1m",
                          progress=False, auto_adjust=True)
         if df.empty:
             return None
