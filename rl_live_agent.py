@@ -112,7 +112,13 @@ def fetch_latest_bars(n=300):
             return None
         df.columns = [c[0].lower() if isinstance(c, tuple) else c.lower()
                       for c in df.columns]
-        df = df.dropna().tail(n)
+        df = df.dropna()
+        # Resample 1m → 5m so features stay compatible with v3 training
+        df = df.resample('5min').agg({
+            'open': 'first', 'high': 'max', 'low': 'min',
+            'close': 'last', 'volume': 'sum'
+        }).dropna()
+        df = df.tail(n)
         df = df.reset_index()
         if 'datetime' in df.columns:
             df = df.rename(columns={'datetime': 'Datetime'})
