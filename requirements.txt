@@ -1,3 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 flask
 joblib
 numpy
@@ -8,4 +9,4 @@ xgboost
 yfinance
 stable-baselines3==2.7.1
 gymnasium
-torch --index-url https://download.pytorch.org/whl/cpu
+torch
