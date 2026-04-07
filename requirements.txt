@@ -8,4 +8,4 @@ xgboost
 yfinance
 stable-baselines3==2.7.1
 gymnasium
-torch
+torch --index-url https://download.pytorch.org/whl/cpu
