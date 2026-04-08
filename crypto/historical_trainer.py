@@ -23,18 +23,21 @@ from reasoning_engine import perceive, interpret, decide
 from trade_memory import TradeMemory
 
 # ── Config ────────────────────────────────────────────────────────────────────
-SYMBOL      = "BTCUSDT"
+SYMBOL      = sys.argv[1] if len(sys.argv) > 1 else "BTCUSDT"
 SL_PCT      = 0.02       # 2% stop loss
 TP_PCT      = 0.04       # 4% take profit (2R)
 MAX_BARS    = 48         # max hold time in bars
 MODEL_PATH  = "crypto_mtf_best.zip"
-MEMORY_FILE = "trade_memory.json"
-LOG_FILE    = "trade_log.csv"
+# Per-symbol output paths — BTCUSDT keeps the legacy filenames for backward compat
+MEMORY_FILE = "trade_memory.json" if SYMBOL == "BTCUSDT" else f"trade_memory_{SYMBOL.lower()}.json"
+LOG_FILE    = "trade_log.csv" if SYMBOL == "BTCUSDT" else f"trade_log_{SYMBOL.lower()}.csv"
+DATASET_PKL = "btc_historical_mtf.pkl" if SYMBOL == "BTCUSDT" else f"{SYMBOL.lower()}_historical_mtf.pkl"
+HIST_LOG    = "historical_trade_log.csv" if SYMBOL == "BTCUSDT" else f"historical_trade_log_{SYMBOL.lower()}.csv"
 
 # ── Fetch historical data ─────────────────────────────────────────────────────
 
 def fetch_historical_mtf(symbol="BTCUSDT"):
-    print("📥 Fetching historical BTC data 2020-2025...")
+    print(f"📥 Fetching historical {symbol} data 2020-2025...")
 
     client = Client("", "")
     client.ping = lambda: None
@@ -258,14 +261,14 @@ if __name__ == "__main__":
         os.rename(MEMORY_FILE, MEMORY_FILE + ".backup")
         print(f"⚠️  Backed up existing memory to {MEMORY_FILE}.backup")
 
-    memory = TradeMemory(memory_file=MEMORY_FILE, log_file="historical_trade_log.csv")
+    memory = TradeMemory(memory_file=MEMORY_FILE, log_file=HIST_LOG)
 
     # Fetch data
     df = fetch_historical_mtf(SYMBOL)
 
     # Save the dataset for reuse
-    df.to_pickle("btc_historical_mtf.pkl")
-    print("💾 Saved dataset to btc_historical_mtf.pkl")
+    df.to_pickle(DATASET_PKL)
+    print(f"💾 Saved dataset to {DATASET_PKL}")
 
     # Train
     total_trades = train(df, model, memory)
@@ -279,7 +282,7 @@ if __name__ == "__main__":
     memory.print_summary()
 
     print("\n📁 Files generated:")
-    print(f"  — trade_memory.json  (agent's brain — commit this to GitHub)")
-    print(f"  — historical_trade_log.csv  (full trade history)")
-    print(f"  — btc_historical_mtf.pkl  (dataset cache)")
-    print(f"\n🚀 Ready to deploy. Commit trade_memory.json and push to GitHub.")
+    print(f"  — {MEMORY_FILE}  (agent's brain — commit this to GitHub)")
+    print(f"  — {HIST_LOG}  (full trade history)")
+    print(f"  — {DATASET_PKL}  (dataset cache)")
+    print(f"\n🚀 Ready to deploy. Commit {MEMORY_FILE} and push to GitHub.")
