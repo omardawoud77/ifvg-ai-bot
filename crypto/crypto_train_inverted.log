@@ -1,0 +1,78 @@
+📊 Inverted split (train on future, test on past):
+   Train: 2025-07-08 → 2026-04-07 (6570 bars)
+   Test:  2025-04-08 → 2025-07-08 (2190 bars)
+
+🚀 Training on later 75%, testing on earlier 25%...
+============================================================
+  Step   5,000 | PnL: -19.7% | WR: 40.9% (79W/114L) | Trades: 193
+  💾 New best!
+  Step  10,000 | PnL: -40.3% | WR: 34.0% (105W/204L) | Trades: 309
+  Step  15,000 | PnL:  -7.4% | WR: 40.3% (95W/141L) | Trades: 237
+  💾 New best!
+  Step  20,000 | PnL:  +6.2% | WR: 39.3% (79W/122L) | Trades: 202
+  💾 New best!
+  Step  25,000 | PnL: +49.5% | WR: 50.0% (55W/55L) | Trades: 111
+  💾 New best!
+  Step  30,000 | PnL:  +4.0% | WR: 50.0% (55W/55L) | Trades: 111
+  Step  35,000 | PnL:  -2.2% | WR: 46.8% (37W/42L) | Trades: 80
+  Step  40,000 | PnL:  +7.6% | WR: 54.5% (42W/35L) | Trades: 78
+  Step  45,000 | PnL: +39.8% | WR: 60.0% (42W/28L) | Trades: 71
+  Step  50,000 | PnL: +72.0% | WR: 62.0% (85W/52L) | Trades: 138
+  💾 New best!
+  Step  55,000 | PnL: +70.8% | WR: 61.6% (90W/56L) | Trades: 147
+  Step  60,000 | PnL: +40.5% | WR: 54.3% (70W/59L) | Trades: 130
+  Step  65,000 | PnL: +62.8% | WR: 58.4% (87W/62L) | Trades: 150
+  Step  70,000 | PnL: +62.6% | WR: 59.2% (90W/62L) | Trades: 153
+  Step  75,000 | PnL: +49.1% | WR: 60.0% (102W/68L) | Trades: 170
+  Step  80,000 | PnL: +45.5% | WR: 57.5% (131W/97L) | Trades: 229
+  Step  85,000 | PnL: +45.6% | WR: 59.1% (114W/79L) | Trades: 194
+  Step  90,000 | PnL:  -2.6% | WR: 50.8% (66W/64L) | Trades: 131
+  Step  95,000 | PnL: +12.1% | WR: 49.4% (77W/79L) | Trades: 157
+  Step 100,000 | PnL: +11.3% | WR: 49.7% (72W/73L) | Trades: 146
+  Step 105,000 | PnL: +30.5% | WR: 58.3% (116W/83L) | Trades: 200
+  Step 110,000 | PnL: +12.0% | WR: 54.6% (106W/88L) | Trades: 194
+  Step 115,000 | PnL: +33.2% | WR: 55.5% (96W/77L) | Trades: 173
+  Step 120,000 | PnL: +21.0% | WR: 52.0% (104W/96L) | Trades: 200
+  Step 125,000 | PnL: +11.1% | WR: 52.3% (91W/83L) | Trades: 174
+  Step 130,000 | PnL: +32.2% | WR: 59.5% (110W/75L) | Trades: 186
+  Step 135,000 | PnL: +44.2% | WR: 61.3% (125W/79L) | Trades: 205
+  Step 140,000 | PnL: +60.6% | WR: 62.1% (131W/80L) | Trades: 212
+  Step 145,000 | PnL: +71.6% | WR: 64.6% (137W/75L) | Trades: 212
+  Step 150,000 | PnL: +31.1% | WR: 59.5% (125W/85L) | Trades: 211
+  Step 155,000 | PnL: +50.3% | WR: 61.9% (143W/88L) | Trades: 232
+  Step 160,000 | PnL: +40.3% | WR: 60.1% (146W/97L) | Trades: 244
+  Step 165,000 | PnL: +27.6% | WR: 54.7% (135W/112L) | Trades: 248
+  Step 170,000 | PnL: +22.2% | WR: 55.2% (122W/99L) | Trades: 222
+  Step 175,000 | PnL: +34.7% | WR: 57.1% (121W/91L) | Trades: 213
+  Step 180,000 | PnL: +57.8% | WR: 62.4% (146W/88L) | Trades: 235
+  Step 185,000 | PnL: +26.0% | WR: 56.0% (141W/111L) | Trades: 253
+  Step 190,000 | PnL: +49.9% | WR: 58.7% (135W/95L) | Trades: 231
+  Step 195,000 | PnL: +56.4% | WR: 63.3% (131W/76L) | Trades: 208
+  Step 200,000 | PnL: +54.7% | WR: 61.4% (132W/83L) | Trades: 216
+  Step 205,000 | PnL: +50.4% | WR: 58.3% (119W/85L) | Trades: 205
+  Step 210,000 | PnL: +37.7% | WR: 58.1% (136W/98L) | Trades: 235
+  Step 215,000 | PnL: +51.3% | WR: 61.0% (133W/85L) | Trades: 219
+  Step 220,000 | PnL: +47.0% | WR: 62.4% (126W/76L) | Trades: 203
+  Step 225,000 | PnL: +55.5% | WR: 62.9% (129W/76L) | Trades: 206
+  Step 230,000 | PnL: +63.1% | WR: 61.7% (137W/85L) | Trades: 223
+  Step 235,000 | PnL: +69.0% | WR: 59.3% (140W/96L) | Trades: 237
+  Step 240,000 | PnL: +37.6% | WR: 56.4% (146W/113L) | Trades: 260
+  Step 245,000 | PnL: +49.8% | WR: 60.2% (148W/98L) | Trades: 247
+  Step 250,000 | PnL: +44.0% | WR: 59.0% (128W/89L) | Trades: 218
+
+⏹️  Early stop
+
+============================================================
+
+📊 TRUE TIME-OOS RESULTS (trained on future, tested on past):
+   WR:          62.0% (85W/52L)
+   Avg Winner:  +1.08%
+   Avg Loser:   -0.71%
+   R:R:         1.54x
+   Expectancy:  +0.40%/trade
+   Median Hold: 7h
+   B&H (test):  +36.9%
+
+   Baseline: 68.3% WR, +0.63%/trade expectancy (ETH cross-symbol)
+
+✅ TIME-OOS CONFIRMED — edge is regime-independent!

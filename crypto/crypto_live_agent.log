@@ -1,0 +1,43 @@
+2026-04-08 02:10:13,475 | INFO | 🚀 Crypto Live Agent starting (FUTURES TESTNET)
+2026-04-08 02:10:13,475 | INFO |    Symbol:    BTCUSDT
+2026-04-08 02:10:13,475 | INFO |    Notional:  $100.0 USDT
+2026-04-08 02:10:13,475 | INFO |    Leverage:  1× (no margin risk)
+2026-04-08 02:10:13,475 | INFO |    Hard SL:   2.0%
+2026-04-08 02:10:13,475 | INFO |    Model:     crypto_mtf_best.zip
+2026-04-08 02:10:14,342 | INFO | ✅ Connected to futures testnet | USDT balance: 5,000.00
+2026-04-08 02:10:15,083 | INFO | ✅ Leverage set to 1× for BTCUSDT
+2026-04-08 02:10:15,649 | INFO | ✅ Model loaded: crypto_mtf_best.zip
+2026-04-08 02:10:16,642 | INFO | ✅ Symbol filters: step=0.0001, min_qty=0.0001, precision=4
+2026-04-08 02:10:16,643 | INFO | ✅ State: position=0, trades=0, PnL=$+0.00
+2026-04-08 02:10:16,643 | INFO | 
+============================================================
+2026-04-08 02:10:16,643 | INFO | 📡 Live loop active — checking every 5 min for new 1h bar
+2026-04-08 02:10:16,643 | INFO | ============================================================
+
+2026-04-08 02:10:17,739 | INFO | 
+📊 New bar: 2026-04-07 23:00:00+00:00 | Close: $71,924
+2026-04-08 02:10:17,752 | INFO | 🤖 Decision: BUY (long) | Position: 0
+2026-04-08 02:10:18,017 | ERROR | ❌ Order failed: APIError(code=-4164): Order's notional must be no smaller than 100 (unless you choose reduce only).
+2026-04-08 02:10:18,018 | INFO | 📋 Trades: 0 | WR: 0.0% | PnL: $+0.00
+2026-04-08 02:14:49,227 | INFO | 🚀 Crypto Live Agent starting (FUTURES TESTNET)
+2026-04-08 02:14:49,228 | INFO |    Symbol:    BTCUSDT
+2026-04-08 02:14:49,228 | INFO |    Notional:  $110.0 USDT
+2026-04-08 02:14:49,228 | INFO |    Leverage:  1× (no margin risk)
+2026-04-08 02:14:49,228 | INFO |    Hard SL:   2.0%
+2026-04-08 02:14:49,228 | INFO |    Model:     crypto_mtf_best.zip
+2026-04-08 02:14:50,462 | INFO | ✅ Connected to futures testnet | USDT balance: 5,000.00
+2026-04-08 02:14:51,196 | INFO | ✅ Leverage set to 1× for BTCUSDT
+2026-04-08 02:14:51,752 | INFO | ✅ Model loaded: crypto_mtf_best.zip
+2026-04-08 02:14:52,755 | INFO | ✅ Symbol filters: step=0.0001, min_qty=0.0001, precision=4
+2026-04-08 02:14:52,755 | INFO | ✅ State: position=0, trades=0, PnL=$+0.00
+2026-04-08 02:14:52,755 | INFO | 
+============================================================
+2026-04-08 02:14:52,755 | INFO | 📡 Live loop active — checking every 5 min for new 1h bar
+2026-04-08 02:14:52,755 | INFO | ============================================================
+
+2026-04-08 02:14:53,849 | INFO | 
+📊 New bar: 2026-04-07 23:00:00+00:00 | Close: $71,924
+2026-04-08 02:14:53,859 | INFO | 🤖 Decision: BUY (long) | Position: 0
+2026-04-08 02:14:54,246 | INFO | ✅ Futures order: BUY 0.0015 BTCUSDT (reduceOnly=False)
+2026-04-08 02:14:54,247 | INFO | 📈 LONG opened | qty=0.0015 @ $71,924
+2026-04-08 02:14:54,248 | INFO | 📋 Trades: 1 | WR: 0.0% | PnL: $+0.00
