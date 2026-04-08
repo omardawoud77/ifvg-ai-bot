@@ -127,7 +127,19 @@ class WRFocusedCryptoEnv(CryptoMTFEnv):
     Same observations and action space as CryptoMTFEnv, but the reward
     is purely categorical: +2 per winning close, -3 per losing close,
     -0.001 per bar of holding/idleness. PnL magnitude is irrelevant.
+
+    Fills are realistic: entries and voluntary/timeout exits fill at the
+    NEXT bar's open (decision happens at bar i close, order routes to the
+    exchange, fills as bar i+1 opens). SL exits still fill intra-bar at
+    the SL price level.
+
+    Min-profit gate: a voluntary close (action == 3) is only allowed when
+    the trade is either in loss (cut losses freely) or in profit ≥
+    MIN_WIN_PCT (currently 0.3%). Profitable scalps below the floor are
+    rejected to prevent the noise-floor scalping pathology.
     """
+
+    MIN_WIN_PCT = 0.003   # 0.3% — voluntary closes below this gain are rejected
 
     def __init__(self, df, win_reward=WIN_REWARD, loss_penalty=LOSS_PENALTY,
                  hold_penalty=HOLD_PENALTY, max_hold_bars=MAX_HOLD_BARS, **kwargs):
@@ -135,6 +147,14 @@ class WRFocusedCryptoEnv(CryptoMTFEnv):
         self.win_reward = win_reward
         self.loss_penalty = loss_penalty
         self.hold_penalty = hold_penalty
+
+    def _next_open(self):
+        """Fill price for entries / voluntary / timeout exits.
+        Falls back to current close if we're on the very last bar."""
+        nxt = self.current_idx + 1
+        if nxt < len(self.df):
+            return float(self.df['open'].iloc[nxt])
+        return float(self.df['close'].iloc[self.current_idx])
 
     def step(self, action):
         df = self.df
@@ -146,16 +166,18 @@ class WRFocusedCryptoEnv(CryptoMTFEnv):
         info = {}
         done = False
 
-        # Entry
+        # Entry — fill at next bar's open (no lookahead)
         if self.position == 0:
             if action == 1:
+                fill = self._next_open()
                 self.position = 1
-                self.entry_price = c * (1 + self.fee_pct)
+                self.entry_price = fill * (1 + self.fee_pct)
                 self.bars_held = 0
                 self.total_trades += 1
             elif action == 2:
+                fill = self._next_open()
                 self.position = -1
-                self.entry_price = c * (1 - self.fee_pct)
+                self.entry_price = fill * (1 - self.fee_pct)
                 self.bars_held = 0
                 self.total_trades += 1
 
@@ -168,6 +190,7 @@ class WRFocusedCryptoEnv(CryptoMTFEnv):
 
             close_reason = None
             c_exit = c
+            # SL fills intra-bar at the price level (not bar-referenced)
             if self.position == 1 and l <= self.entry_price * (1 - self.sl_pct):
                 close_reason = 'SL'
                 c_exit = self.entry_price * (1 - self.sl_pct)
@@ -175,13 +198,22 @@ class WRFocusedCryptoEnv(CryptoMTFEnv):
                 close_reason = 'SL'
                 c_exit = self.entry_price * (1 + self.sl_pct)
 
+            # Voluntary close — gated by min-profit floor and filled at next open
             if action == 3 and close_reason is None:
-                close_reason = 'AGENT'
-                c_exit = c * (1 - self.fee_pct if self.position == 1 else 1 + self.fee_pct)
+                # Estimate the realized PnL the agent would lock in if we
+                # filled at next-bar open. Use current close as a proxy
+                # for the gate decision (the true fill is unknown until
+                # bar i+1 opens, but the agent's signal is based on bar i).
+                if upnl_pct < 0 or upnl_pct >= self.MIN_WIN_PCT:
+                    fill = self._next_open()
+                    close_reason = 'AGENT'
+                    c_exit = fill * ((1 - self.fee_pct) if self.position == 1 else (1 + self.fee_pct))
+                # else: reject the close, treat as hold (no-op this step)
 
             if self.bars_held >= self.max_hold_bars and close_reason is None:
+                fill = self._next_open()
                 close_reason = 'TIMEOUT'
-                c_exit = c
+                c_exit = fill
 
             if close_reason:
                 pnl_pct = (c_exit - self.entry_price) / self.entry_price * self.position
