@@ -176,6 +176,7 @@ def main():
     # Two clients: one for mainnet futures data, one for testnet execution
     # data_client uses default mainnet futures endpoint (fapi.binance.com)
     data_client = Client(api_key, api_secret, requests_params={"timeout": 20})
+    data_client.ping = lambda: None  # skip geo-blocked spot ping
 
     # client is for testnet execution only
     client = Client(api_key, api_secret, requests_params={"timeout": 20})
