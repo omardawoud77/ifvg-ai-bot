@@ -274,6 +274,16 @@ def reason(ppo_action, conditions, perception, memory):
                 )
                 confidence += adj
 
+        # Regret adjustment — lower bar for setups agent kept wrongly rejecting
+        regret_adj = memory.get_regret_adjustment(conditions)
+        if regret_adj > 0:
+            stats = memory.memory['condition_stats'].get(memory._make_key(conditions), {})
+            evidence_for.append(
+                f"Regret learning: agent missed profitable trades here "
+                f"{stats.get('missed_profitable', 0)} times — lowering bar"
+            )
+            confidence += regret_adj
+
     elif ppo_action == 3:  # CLOSE
         confidence = 0.80
         evidence_for.append("PPO model signaling close")
@@ -300,6 +310,52 @@ def reason(ppo_action, conditions, perception, memory):
         verdict = "EXECUTE" if confidence >= 0.50 else "REJECT"
 
     return verdict, confidence, evidence_for, evidence_against
+
+
+# ── REGRET SIMULATION ────────────────────────────────────────────────────────
+
+def simulate_missed_trade(df, rejection_bar_idx, rejected_action, sl_pct, tp_pct, max_bars=48):
+    """
+    Simulate what would have happened if we had taken the rejected trade.
+    Returns (was_profitable, pnl_pct, exit_reason)
+    """
+    if rejection_bar_idx + 1 >= len(df):
+        return None, 0.0, "NO_DATA"
+
+    entry_price = float(df.iloc[rejection_bar_idx]['close'])
+    direction = 1 if rejected_action == 1 else -1
+
+    if direction == 1:
+        sl_price = entry_price * (1 - sl_pct)
+        tp_price = entry_price * (1 + tp_pct)
+    else:
+        sl_price = entry_price * (1 + sl_pct)
+        tp_price = entry_price * (1 - tp_pct)
+
+    for i in range(1, min(max_bars + 1, len(df) - rejection_bar_idx)):
+        bar = df.iloc[rejection_bar_idx + i]
+        high = float(bar.get('high', bar['close']))
+        low = float(bar.get('low', bar['close']))
+
+        if direction == 1:
+            if low <= sl_price:
+                pnl = (sl_price - entry_price) / entry_price
+                return False, pnl, "SL"
+            if high >= tp_price:
+                pnl = (tp_price - entry_price) / entry_price
+                return True, pnl, "TP"
+        else:
+            if high >= sl_price:
+                pnl = (entry_price - sl_price) / entry_price
+                return False, pnl, "SL"
+            if low <= tp_price:
+                pnl = (entry_price - tp_price) / entry_price
+                return True, pnl, "TP"
+
+    # Time exit
+    exit_price = float(df.iloc[min(rejection_bar_idx + max_bars, len(df)-1)]['close'])
+    pnl = (exit_price - entry_price) / entry_price * direction
+    return pnl > 0, pnl, "TIME"
 
 
 # ── LAYER 3.5: DYNAMIC RISK SIZING ───────────────────────────────────────────

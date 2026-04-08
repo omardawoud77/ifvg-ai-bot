@@ -108,6 +108,63 @@ class TradeMemory:
                 reasoning[:200]
             ])
 
+    def record_missed_trade(self, conditions, was_profitable):
+        key = self._make_key(conditions)
+        if key not in self.memory["condition_stats"]:
+            self.memory["condition_stats"][key] = {
+                "wins": 0, "losses": 0, "total": 0,
+                "total_pnl_pct": 0.0,
+                "avg_win_pct": 0.0, "avg_loss_pct": 0.0,
+                "win_pnls": [], "loss_pnls": [],
+                "missed_profitable": 0,
+                "missed_losing": 0,
+                "missed_total": 0,
+                "regret_score": 0.0
+            }
+        s = self.memory["condition_stats"][key]
+        s.setdefault("missed_profitable", 0)
+        s.setdefault("missed_losing", 0)
+        s.setdefault("missed_total", 0)
+        s["missed_total"] += 1
+        if was_profitable:
+            s["missed_profitable"] += 1
+        else:
+            s["missed_losing"] += 1
+        # Regret score: ratio of profitable misses to total misses
+        # High regret = agent kept rejecting winning trades
+        if s["missed_total"] >= 3:
+            s["regret_score"] = s["missed_profitable"] / s["missed_total"]
+        self.save()
+
+    def get_regret_adjustment(self, conditions):
+        key = self._make_key(conditions)
+        stats = self.memory["condition_stats"].get(key, {})
+        missed_total = stats.get("missed_total", 0)
+        regret_score = stats.get("regret_score", 0.0)
+        if missed_total < 3:
+            return 0.0
+        # If agent kept missing profitable trades, lower the bar
+        if regret_score >= 0.70:
+            return 0.15
+        elif regret_score >= 0.60:
+            return 0.10
+        elif regret_score >= 0.50:
+            return 0.05
+        return 0.0
+
+    def get_regret_summary(self, min_missed=3):
+        rows = []
+        for key, stats in self.memory["condition_stats"].items():
+            missed = stats.get("missed_total", 0)
+            if missed >= min_missed:
+                rows.append({
+                    "condition": key,
+                    "regret_score": stats.get("regret_score", 0.0),
+                    "missed_profitable": stats.get("missed_profitable", 0),
+                    "missed_total": missed
+                })
+        return sorted(rows, key=lambda x: x["regret_score"], reverse=True)
+
     def find_similar(self, conditions):
         key = self._make_key(conditions)
         return self.memory["condition_stats"].get(key)

@@ -26,7 +26,7 @@ from binance.client import Client
 from binance.exceptions import BinanceAPIException
 from stable_baselines3 import PPO
 from crypto_env_v2 import CryptoMTFEnv
-from reasoning_engine import perceive, interpret, decide, get_dynamic_sl_tp
+from reasoning_engine import perceive, interpret, decide, get_dynamic_sl_tp, simulate_missed_trade
 from trade_memory import TradeMemory
 
 # ── Config ─────────────────────────────────────────────────────────────────────
@@ -71,6 +71,11 @@ DEFAULT_STATE = {
     "entry_confidence": 0.5,
     "entry_verdict": None,
     "entry_reasoning": "",
+    "last_rejected_action": None,
+    "last_rejected_conditions": None,
+    "last_rejected_bar_ts": None,
+    "last_rejected_sl_pct": 0.02,
+    "last_rejected_tp_pct": 0.04,
 }
 
 def load_state():
@@ -289,6 +294,47 @@ def main():
             current_price = float(df['close'].iloc[-2])
             log.info(f"\n📊 New bar: {latest_bar_time} | Close: ${current_price:,.0f}")
 
+            # ── Regret review: what happened to the trade we rejected last bar? ──
+            if (state.get('last_rejected_action') is not None and
+                state.get('position') == 0):
+                try:
+                    rejected_ts = state.get('last_rejected_bar_ts')
+                    rejected_action = state['last_rejected_action']
+                    rejected_conditions = state['last_rejected_conditions']
+                    r_sl = state.get('last_rejected_sl_pct', 0.02)
+                    r_tp = state.get('last_rejected_tp_pct', 0.04)
+
+                    # Resolve rejection bar by timestamp (window slides each fetch)
+                    rejected_idx = None
+                    if rejected_ts:
+                        target = pd.Timestamp(rejected_ts)
+                        matches = df.index[df['Datetime'] == target].tolist()
+                        if matches:
+                            rejected_idx = int(matches[0])
+
+                    if rejected_idx is not None and rejected_idx < len(df) - 1:
+                        was_profitable, pnl, exit_reason = simulate_missed_trade(
+                            df, rejected_idx, rejected_action, r_sl, r_tp
+                        )
+                        if was_profitable is not None:
+                            memory.record_missed_trade(rejected_conditions, was_profitable)
+                            action_name = "BUY" if rejected_action == 1 else "SELL"
+                            outcome = "✅ WOULD HAVE WON" if was_profitable else "❌ WOULD HAVE LOST"
+                            log.info(f"🧠 Regret review: rejected {action_name} last bar → {outcome} ({pnl*100:+.2f}% via {exit_reason})")
+                            regret_summary = memory.get_regret_summary(min_missed=3)
+                            if regret_summary:
+                                top = regret_summary[0]
+                                log.info(f"   Top regret setup: {top['condition']} — wrongly rejected {top['missed_profitable']}/{top['missed_total']} times")
+                    else:
+                        log.warning(f"⚠️  Regret review: rejected bar {rejected_ts} not found in current window — skipping")
+                except Exception as e:
+                    log.error(f"❌ Regret review failed: {e}")
+                finally:
+                    state['last_rejected_action'] = None
+                    state['last_rejected_conditions'] = None
+                    state['last_rejected_bar_ts'] = None
+                    save_state(state)
+
             # Reconcile local state with exchange position
             try:
                 pos_info = client.futures_position_information(symbol=SYMBOL)
@@ -375,7 +421,15 @@ def main():
             log.info(f"\n{'='*55}\n{reasoning_text}\n{'='*55}")
 
             if action in (1, 2) and verdict not in ("EXECUTE", "WEAK_EXECUTE"):
-                log.info(f"⛔ Trade REJECTED by reasoning engine")
+                # Store rejection for regret review next bar
+                sl_pct_rej, tp_pct_rej = get_dynamic_sl_tp(conditions, memory)
+                state['last_rejected_action'] = action
+                state['last_rejected_conditions'] = conditions
+                state['last_rejected_bar_ts'] = latest_bar_time.isoformat() if hasattr(latest_bar_time, 'isoformat') else str(latest_bar_time)
+                state['last_rejected_sl_pct'] = sl_pct_rej
+                state['last_rejected_tp_pct'] = tp_pct_rej
+                save_state(state)
+                log.info(f"⛔ Trade REJECTED — stored for regret review next bar")
                 wr = state['wins'] / max(1, state['wins'] + state['losses'])
                 log.info(f"📋 Trades: {state['trade_count']} | WR: {wr:.1%} | PnL: ${state['total_pnl_usdt']:+.2f}")
                 time.sleep(FETCH_EVERY)
