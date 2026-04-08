@@ -75,10 +75,10 @@ def save_state(state):
     with open(STATE_PATH, "w") as f:
         json.dump(state, f, indent=2)
 
-# ── Data fetch (public spot mainnet — no auth needed) ─────────────────────────
+# ── Data fetch (futures klines — works from geo-blocked regions like Railway) ─
 def fetch_mtf(client, symbol="BTCUSDT", bars=200):
     def fetch_tf(interval, limit):
-        klines = client.get_klines(symbol=symbol, interval=interval, limit=limit)
+        klines = client.futures_klines(symbol=symbol, interval=interval, limit=limit)
         df = pd.DataFrame(klines, columns=[
             'ts','open','high','low','close','volume',
             'close_time','qav','trades','tbbav','tbqav','ignore'
@@ -174,7 +174,8 @@ def main():
     log.info(f"   Model:     {MODEL_PATH}")
 
     # Single client — spot mainnet for data, futures testnet for trades
-    client = Client(api_key, api_secret)
+    client = Client(api_key, api_secret, requests_params={"timeout": 20})
+    client.ping = lambda: None  # skip geo-blocked spot ping
     client.FUTURES_URL = FUTURES_TESTNET_URL
 
     # Verify connection
