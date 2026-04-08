@@ -10,3 +10,4 @@ yfinance
 stable-baselines3==2.7.1
 gymnasium
 torch
+python-binance==1.0.19
