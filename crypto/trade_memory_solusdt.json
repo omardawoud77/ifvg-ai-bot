@@ -17,9 +17,9 @@
         -0.019999999999999955,
         -0.020000000000000073
       ],
-      "missed_profitable": 1,
-      "missed_losing": 2,
-      "missed_total": 3,
+      "missed_profitable": 2,
+      "missed_losing": 4,
+      "missed_total": 6,
       "regret_score": 0.3333333333333333
     },
     "STRONG_BULL|LONDON|HIGH|WEAK_DOWN": {
@@ -36,10 +36,10 @@
         -0.01999999999999997,
         -0.020000000000000004
       ],
-      "missed_profitable": 2,
-      "missed_losing": 1,
-      "missed_total": 3,
-      "regret_score": 0.6666666666666666
+      "missed_profitable": 9,
+      "missed_losing": 7,
+      "missed_total": 16,
+      "regret_score": 0.5625
     },
     "MILD_BULL|LONDON|HIGH|STRONG_UP": {
       "wins": 1,
@@ -61,9 +61,9 @@
         -0.020000000000000018,
         -0.01999999999999997
       ],
-      "missed_profitable": 40,
-      "missed_losing": 23,
-      "missed_total": 63,
+      "missed_profitable": 80,
+      "missed_losing": 46,
+      "missed_total": 126,
       "regret_score": 0.6349206349206349
     },
     "STRONG_BEAR|NY_OPEN|LOW|WEAK_DOWN": {
@@ -81,9 +81,9 @@
         -0.019999999999999973,
         -0.01999999999999999
       ],
-      "missed_profitable": 72,
-      "missed_losing": 63,
-      "missed_total": 135,
+      "missed_profitable": 144,
+      "missed_losing": 126,
+      "missed_total": 270,
       "regret_score": 0.5333333333333333
     },
     "MILD_BULL|LONDON|HIGH|WEAK_UP": {
@@ -101,9 +101,9 @@
         -0.020000000000000077,
         -0.019999999999999966
       ],
-      "missed_profitable": 21,
-      "missed_losing": 29,
-      "missed_total": 50,
+      "missed_profitable": 42,
+      "missed_losing": 58,
+      "missed_total": 100,
       "regret_score": 0.42
     },
     "MILD_BULL|LONDON|NORMAL|WEAK_UP": {
@@ -122,10 +122,10 @@
         -0.01999999999999998,
         -0.019999999999999955
       ],
-      "missed_profitable": 216,
-      "missed_losing": 111,
-      "missed_total": 327,
-      "regret_score": 0.6605504587155964
+      "missed_profitable": 451,
+      "missed_losing": 337,
+      "missed_total": 788,
+      "regret_score": 0.5723350253807107
     },
     "MILD_BULL|NY_OPEN|HIGH|STRONG_DOWN": {
       "wins": 6,
@@ -152,9 +152,9 @@
         -0.02000000000000008,
         -0.02000000000000002
       ],
-      "missed_profitable": 47,
-      "missed_losing": 56,
-      "missed_total": 103,
+      "missed_profitable": 94,
+      "missed_losing": 112,
+      "missed_total": 206,
       "regret_score": 0.4563106796116505
     },
     "MILD_BEAR|NY_PM|NORMAL|WEAK_DOWN": {
@@ -182,9 +182,9 @@
         -0.020000000000000066,
         -0.020000000000000063
       ],
-      "missed_profitable": 65,
-      "missed_losing": 149,
-      "missed_total": 214,
+      "missed_profitable": 130,
+      "missed_losing": 298,
+      "missed_total": 428,
       "regret_score": 0.3037383177570093
     },
     "MILD_BULL|NY_OPEN|VERY_HIGH|STRONG_UP": {
@@ -208,9 +208,9 @@
         -0.019999999999999955,
         -0.020000000000000084
       ],
-      "missed_profitable": 62,
-      "missed_losing": 83,
-      "missed_total": 145,
+      "missed_profitable": 124,
+      "missed_losing": 166,
+      "missed_total": 290,
       "regret_score": 0.42758620689655175
     },
     "MILD_BULL|NY_OPEN|NORMAL|WEAK_UP": {
@@ -229,10 +229,10 @@
         -0.01999999999999994,
         -0.020000000000000004
       ],
-      "missed_profitable": 149,
-      "missed_losing": 106,
-      "missed_total": 255,
-      "regret_score": 0.5843137254901961
+      "missed_profitable": 311,
+      "missed_losing": 272,
+      "missed_total": 583,
+      "regret_score": 0.5334476843910806
     },
     "MILD_BEAR|NY_OPEN|NORMAL|STRONG_DOWN": {
       "wins": 15,
@@ -279,9 +279,9 @@
         -0.019999999999999987,
         -0.02000000000000003
       ],
-      "missed_profitable": 68,
-      "missed_losing": 79,
-      "missed_total": 147,
+      "missed_profitable": 136,
+      "missed_losing": 158,
+      "missed_total": 294,
       "regret_score": 0.46258503401360546
     },
     "STRONG_BEAR|NY_OPEN|HIGH|WEAK_UP": {
@@ -299,9 +299,9 @@
         -0.020000000000000077,
         -0.020000000000000077
       ],
-      "missed_profitable": 53,
-      "missed_losing": 63,
-      "missed_total": 116,
+      "missed_profitable": 106,
+      "missed_losing": 126,
+      "missed_total": 232,
       "regret_score": 0.45689655172413796
     },
     "MILD_BEAR|LONDON|NORMAL|WEAK_DOWN": {
@@ -325,9 +325,9 @@
         -0.019999999999999987,
         -0.020000000000000066
       ],
-      "missed_profitable": 155,
-      "missed_losing": 231,
-      "missed_total": 386,
+      "missed_profitable": 310,
+      "missed_losing": 462,
+      "missed_total": 772,
       "regret_score": 0.4015544041450777
     },
     "MILD_BEAR|NY_OPEN|VERY_HIGH|STRONG_UP": {
@@ -346,9 +346,9 @@
         -0.020000000000000025,
         -0.020000000000000066
       ],
-      "missed_profitable": 54,
-      "missed_losing": 77,
-      "missed_total": 131,
+      "missed_profitable": 108,
+      "missed_losing": 154,
+      "missed_total": 262,
       "regret_score": 0.4122137404580153
     },
     "STRONG_BEAR|LONDON|NORMAL|STRONG_DOWN": {
@@ -372,9 +372,9 @@
         -0.01999999999999997,
         -0.019999999999999987
       ],
-      "missed_profitable": 81,
-      "missed_losing": 68,
-      "missed_total": 149,
+      "missed_profitable": 162,
+      "missed_losing": 136,
+      "missed_total": 298,
       "regret_score": 0.5436241610738255
     },
     "STRONG_BEAR|LONDON|LOW|WEAK_DOWN": {
@@ -393,9 +393,9 @@
         -0.02000000000000003,
         -0.02000000000000005
       ],
-      "missed_profitable": 179,
-      "missed_losing": 213,
-      "missed_total": 392,
+      "missed_profitable": 358,
+      "missed_losing": 426,
+      "missed_total": 784,
       "regret_score": 0.45663265306122447
     },
     "MILD_BEAR|LONDON|NORMAL|STRONG_DOWN": {
@@ -414,9 +414,9 @@
         -0.020000000000000056,
         -0.01999999999999999
       ],
-      "missed_profitable": 64,
-      "missed_losing": 92,
-      "missed_total": 156,
+      "missed_profitable": 128,
+      "missed_losing": 184,
+      "missed_total": 312,
       "regret_score": 0.41025641025641024
     },
     "MILD_BULL|NY_PM|HIGH|STRONG_UP": {
@@ -434,10 +434,10 @@
         -0.020000000000000087,
         -0.02000000000000006
       ],
-      "missed_profitable": 23,
-      "missed_losing": 20,
-      "missed_total": 43,
-      "regret_score": 0.5348837209302325
+      "missed_profitable": 46,
+      "missed_losing": 42,
+      "missed_total": 88,
+      "regret_score": 0.5227272727272727
     },
     "MILD_BEAR|LONDON|VERY_HIGH|WEAK_UP": {
       "wins": 1,
@@ -455,10 +455,10 @@
         -0.019999999999999983,
         -0.02
       ],
-      "missed_profitable": 8,
-      "missed_losing": 6,
-      "missed_total": 14,
-      "regret_score": 0.5714285714285714
+      "missed_profitable": 16,
+      "missed_losing": 13,
+      "missed_total": 29,
+      "regret_score": 0.5517241379310345
     },
     "MILD_BEAR|NY_OPEN|NORMAL|WEAK_DOWN": {
       "wins": 10,
@@ -494,9 +494,9 @@
         -0.019999999999999993,
         -0.01999999999999996
       ],
-      "missed_profitable": 114,
-      "missed_losing": 218,
-      "missed_total": 332,
+      "missed_profitable": 228,
+      "missed_losing": 436,
+      "missed_total": 664,
       "regret_score": 0.3433734939759036
     },
     "STRONG_BEAR|NY_PM|HIGH|WEAK_UP": {
@@ -515,10 +515,10 @@
         -0.019999999999999966,
         -0.020000000000000025
       ],
-      "missed_profitable": 21,
-      "missed_losing": 9,
-      "missed_total": 30,
-      "regret_score": 0.7
+      "missed_profitable": 41,
+      "missed_losing": 18,
+      "missed_total": 59,
+      "regret_score": 0.6949152542372882
     },
     "STRONG_BEAR|NY_OPEN|NORMAL|WEAK_UP": {
       "wins": 0,
@@ -535,9 +535,9 @@
         -0.019999999999999955,
         -0.02000000000000004
       ],
-      "missed_profitable": 194,
-      "missed_losing": 146,
-      "missed_total": 340,
+      "missed_profitable": 388,
+      "missed_losing": 292,
+      "missed_total": 680,
       "regret_score": 0.5705882352941176
     },
     "STRONG_BEAR|NY_OPEN|NORMAL|STRONG_DOWN": {
@@ -561,9 +561,9 @@
         -0.019999999999999945,
         -0.02000000000000006
       ],
-      "missed_profitable": 90,
-      "missed_losing": 75,
-      "missed_total": 165,
+      "missed_profitable": 180,
+      "missed_losing": 150,
+      "missed_total": 330,
       "regret_score": 0.5454545454545454
     },
     "MILD_BULL|NY_OPEN|VERY_HIGH|WEAK_UP": {
@@ -587,10 +587,10 @@
         -0.02000000000000002,
         -0.020000000000000018
       ],
-      "missed_profitable": 34,
-      "missed_losing": 23,
-      "missed_total": 57,
-      "regret_score": 0.5964912280701754
+      "missed_profitable": 70,
+      "missed_losing": 50,
+      "missed_total": 120,
+      "regret_score": 0.5833333333333334
     },
     "MILD_BULL|LONDON|NORMAL|STRONG_UP": {
       "wins": 2,
@@ -611,10 +611,10 @@
         -0.02000000000000006,
         -0.019999999999999962
       ],
-      "missed_profitable": 91,
-      "missed_losing": 62,
-      "missed_total": 153,
-      "regret_score": 0.5947712418300654
+      "missed_profitable": 187,
+      "missed_losing": 155,
+      "missed_total": 342,
+      "regret_score": 0.5467836257309941
     },
     "MILD_BULL|LONDON|VERY_HIGH|STRONG_UP": {
       "wins": 6,
@@ -637,9 +637,9 @@
         -0.020000000000000077,
         -0.019999999999999934
       ],
-      "missed_profitable": 16,
-      "missed_losing": 17,
-      "missed_total": 33,
+      "missed_profitable": 32,
+      "missed_losing": 34,
+      "missed_total": 66,
       "regret_score": 0.48484848484848486
     },
     "STRONG_BEAR|LONDON|VERY_HIGH|WEAK_UP": {
@@ -661,9 +661,9 @@
         -0.020000000000000046,
         -0.019999999999999952
       ],
-      "missed_profitable": 6,
-      "missed_losing": 2,
-      "missed_total": 8,
+      "missed_profitable": 12,
+      "missed_losing": 4,
+      "missed_total": 16,
       "regret_score": 0.75
     },
     "STRONG_BULL|LONDON|LOW|WEAK_UP": {
@@ -681,9 +681,9 @@
         -0.02000000000000008,
         -0.02000000000000006
       ],
-      "missed_profitable": 116,
-      "missed_losing": 72,
-      "missed_total": 188,
+      "missed_profitable": 232,
+      "missed_losing": 144,
+      "missed_total": 376,
       "regret_score": 0.6170212765957447
     },
     "MILD_BULL|NY_OPEN|NORMAL|WEAK_DOWN": {
@@ -702,9 +702,9 @@
         -0.02000000000000007,
         -0.02
       ],
-      "missed_profitable": 148,
-      "missed_losing": 168,
-      "missed_total": 316,
+      "missed_profitable": 296,
+      "missed_losing": 336,
+      "missed_total": 632,
       "regret_score": 0.46835443037974683
     },
     "MILD_BULL|LONDON|VERY_HIGH|STRONG_DOWN": {
@@ -759,9 +759,9 @@
         -0.019999999999999934,
         -0.020000000000000014
       ],
-      "missed_profitable": 2,
-      "missed_losing": 2,
-      "missed_total": 4,
+      "missed_profitable": 16,
+      "missed_losing": 16,
+      "missed_total": 32,
       "regret_score": 0.5
     },
     "MILD_BEAR|NY_OPEN|HIGH|WEAK_DOWN": {
@@ -791,9 +791,9 @@
         -0.02000000000000006,
         -0.019999999999999924
       ],
-      "missed_profitable": 48,
-      "missed_losing": 85,
-      "missed_total": 133,
+      "missed_profitable": 96,
+      "missed_losing": 170,
+      "missed_total": 266,
       "regret_score": 0.3609022556390977
     },
     "STRONG_BULL|LONDON|LOW|STRONG_UP": {
@@ -811,9 +811,9 @@
         -0.020000000000000025,
         -0.02000000000000007
       ],
-      "missed_profitable": 13,
-      "missed_losing": 13,
-      "missed_total": 26,
+      "missed_profitable": 26,
+      "missed_losing": 26,
+      "missed_total": 52,
       "regret_score": 0.5
     },
     "MILD_BULL|NY_OPEN|NORMAL|STRONG_UP": {
@@ -832,10 +832,10 @@
         -0.020000000000000108,
         -0.01999999999999997
       ],
-      "missed_profitable": 79,
-      "missed_losing": 60,
-      "missed_total": 139,
-      "regret_score": 0.5683453237410072
+      "missed_profitable": 161,
+      "missed_losing": 140,
+      "missed_total": 301,
+      "regret_score": 0.5348837209302325
     },
     "STRONG_BEAR|LONDON|NORMAL|WEAK_UP": {
       "wins": 2,
@@ -856,10 +856,10 @@
         -0.020000000000000042,
         -0.02000000000000002
       ],
-      "missed_profitable": 181,
-      "missed_losing": 42,
-      "missed_total": 223,
-      "regret_score": 0.8116591928251121
+      "missed_profitable": 366,
+      "missed_losing": 95,
+      "missed_total": 461,
+      "regret_score": 0.7939262472885033
     },
     "STRONG_BEAR|NY_PM|HIGH|STRONG_DOWN": {
       "wins": 1,
@@ -881,10 +881,10 @@
         -0.020000000000000025,
         -0.020000000000000025
       ],
-      "missed_profitable": 28,
-      "missed_losing": 18,
-      "missed_total": 46,
-      "regret_score": 0.6086956521739131
+      "missed_profitable": 55,
+      "missed_losing": 33,
+      "missed_total": 88,
+      "regret_score": 0.625
     },
     "MILD_BEAR|NY_PM|HIGH|STRONG_DOWN": {
       "wins": 1,
@@ -902,9 +902,9 @@
         -0.019999999999999962,
         -0.020000000000000025
       ],
-      "missed_profitable": 17,
-      "missed_losing": 35,
-      "missed_total": 52,
+      "missed_profitable": 34,
+      "missed_losing": 70,
+      "missed_total": 104,
       "regret_score": 0.3269230769230769
     },
     "STRONG_BULL|NY_OPEN|NORMAL|STRONG_UP": {
@@ -928,9 +928,9 @@
         -0.019999999999999945,
         -0.020000000000000073
       ],
-      "missed_profitable": 62,
-      "missed_losing": 38,
-      "missed_total": 100,
+      "missed_profitable": 124,
+      "missed_losing": 76,
+      "missed_total": 200,
       "regret_score": 0.62
     },
     "MILD_BEAR|LONDON|NORMAL|WEAK_UP": {
@@ -1009,9 +1009,9 @@
         -0.020000000000000056,
         -0.020000000000000042
       ],
-      "missed_profitable": 148,
-      "missed_losing": 256,
-      "missed_total": 404,
+      "missed_profitable": 296,
+      "missed_losing": 512,
+      "missed_total": 808,
       "regret_score": 0.36633663366336633
     },
     "MILD_BULL|NY_OPEN|HIGH|STRONG_UP": {
@@ -1034,9 +1034,9 @@
         -0.019999999999999973,
         -0.020000000000000042
       ],
-      "missed_profitable": 50,
-      "missed_losing": 61,
-      "missed_total": 111,
+      "missed_profitable": 100,
+      "missed_losing": 122,
+      "missed_total": 222,
       "regret_score": 0.45045045045045046
     },
     "MILD_BULL|LONDON|HIGH|WEAK_DOWN": {
@@ -1121,10 +1121,10 @@
         -0.019999999999999966,
         -0.02000000000000008
       ],
-      "missed_profitable": 3,
-      "missed_losing": 0,
-      "missed_total": 3,
-      "regret_score": 1.0
+      "missed_profitable": 8,
+      "missed_losing": 1,
+      "missed_total": 9,
+      "regret_score": 0.8888888888888888
     },
     "STRONG_BEAR|NY_OPEN|VERY_HIGH|STRONG_DOWN": {
       "wins": 3,
@@ -1147,10 +1147,10 @@
         -0.020000000000000066,
         -0.02000000000000002
       ],
-      "missed_profitable": 41,
-      "missed_losing": 18,
-      "missed_total": 59,
-      "regret_score": 0.6949152542372882
+      "missed_profitable": 86,
+      "missed_losing": 71,
+      "missed_total": 157,
+      "regret_score": 0.5477707006369427
     },
     "MILD_BULL|LONDON|NORMAL|WEAK_DOWN": {
       "wins": 1,
@@ -1168,9 +1168,9 @@
         -0.020000000000000025,
         -0.02000000000000005
       ],
-      "missed_profitable": 240,
-      "missed_losing": 212,
-      "missed_total": 452,
+      "missed_profitable": 480,
+      "missed_losing": 424,
+      "missed_total": 904,
       "regret_score": 0.5309734513274337
     },
     "MILD_BULL|LONDON|LOW|WEAK_UP": {
@@ -1189,10 +1189,10 @@
         -0.019999999999999983,
         -0.019999999999999976
       ],
-      "missed_profitable": 223,
-      "missed_losing": 239,
-      "missed_total": 462,
-      "regret_score": 0.48268398268398266
+      "missed_profitable": 446,
+      "missed_losing": 479,
+      "missed_total": 925,
+      "regret_score": 0.4821621621621622
     },
     "MILD_BEAR|LONDON|HIGH|STRONG_DOWN": {
       "wins": 5,
@@ -1217,9 +1217,9 @@
         -0.019999999999999966,
         -0.01999999999999998
       ],
-      "missed_profitable": 29,
-      "missed_losing": 35,
-      "missed_total": 64,
+      "missed_profitable": 58,
+      "missed_losing": 70,
+      "missed_total": 128,
       "regret_score": 0.453125
     },
     "STRONG_BEAR|LONDON|VERY_HIGH|STRONG_DOWN": {
@@ -1243,10 +1243,10 @@
         -0.020000000000000035,
         -0.020000000000000004
       ],
-      "missed_profitable": 26,
-      "missed_losing": 11,
-      "missed_total": 37,
-      "regret_score": 0.7027027027027027
+      "missed_profitable": 54,
+      "missed_losing": 30,
+      "missed_total": 84,
+      "regret_score": 0.6428571428571429
     },
     "STRONG_BULL|NY_PM|NORMAL|WEAK_UP": {
       "wins": 0,
@@ -1263,9 +1263,9 @@
         -0.020000000000000063,
         -0.020000000000000007
       ],
-      "missed_profitable": 58,
-      "missed_losing": 76,
-      "missed_total": 134,
+      "missed_profitable": 116,
+      "missed_losing": 152,
+      "missed_total": 268,
       "regret_score": 0.43283582089552236
     },
     "STRONG_BEAR|LONDON|HIGH|STRONG_DOWN": {
@@ -1291,10 +1291,10 @@
         -0.02000000000000005,
         -0.019999999999999966
       ],
-      "missed_profitable": 39,
-      "missed_losing": 13,
-      "missed_total": 52,
-      "regret_score": 0.75
+      "missed_profitable": 78,
+      "missed_losing": 36,
+      "missed_total": 114,
+      "regret_score": 0.6842105263157895
     },
     "MILD_BEAR|NY_OPEN|HIGH|STRONG_DOWN": {
       "wins": 0,
@@ -1311,9 +1311,9 @@
         -0.020000000000000046,
         -0.020000000000000042
       ],
-      "missed_profitable": 35,
-      "missed_losing": 53,
-      "missed_total": 88,
+      "missed_profitable": 70,
+      "missed_losing": 106,
+      "missed_total": 176,
       "regret_score": 0.3977272727272727
     },
     "STRONG_BEAR|NY_OPEN|NORMAL|WEAK_DOWN": {
@@ -1331,10 +1331,10 @@
         -0.020000000000000077,
         -0.020000000000000028
       ],
-      "missed_profitable": 159,
-      "missed_losing": 47,
-      "missed_total": 206,
-      "regret_score": 0.7718446601941747
+      "missed_profitable": 320,
+      "missed_losing": 98,
+      "missed_total": 418,
+      "regret_score": 0.7655502392344498
     },
     "STRONG_BEAR|LONDON|HIGH|WEAK_UP": {
       "wins": 3,
@@ -1357,9 +1357,9 @@
         -0.01999999999999999,
         -0.02000000000000008
       ],
-      "missed_profitable": 26,
-      "missed_losing": 26,
-      "missed_total": 52,
+      "missed_profitable": 52,
+      "missed_losing": 52,
+      "missed_total": 104,
       "regret_score": 0.5
     },
     "STRONG_BEAR|LONDON|NORMAL|WEAK_DOWN": {
@@ -1383,9 +1383,9 @@
         -0.020000000000000046,
         -0.020000000000000007
       ],
-      "missed_profitable": 167,
-      "missed_losing": 189,
-      "missed_total": 356,
+      "missed_profitable": 334,
+      "missed_losing": 378,
+      "missed_total": 712,
       "regret_score": 0.4691011235955056
     },
     "STRONG_BEAR|NY_PM|HIGH|WEAK_DOWN": {
@@ -1403,10 +1403,10 @@
         -0.020000000000000087,
         -0.01999999999999996
       ],
-      "missed_profitable": 18,
-      "missed_losing": 12,
-      "missed_total": 30,
-      "regret_score": 0.6
+      "missed_profitable": 36,
+      "missed_losing": 22,
+      "missed_total": 58,
+      "regret_score": 0.6206896551724138
     },
     "MILD_BULL|NY_OPEN|HIGH|WEAK_DOWN": {
       "wins": 5,
@@ -1431,9 +1431,9 @@
         -0.020000000000000073,
         -0.020000000000000042
       ],
-      "missed_profitable": 50,
-      "missed_losing": 54,
-      "missed_total": 104,
+      "missed_profitable": 100,
+      "missed_losing": 108,
+      "missed_total": 208,
       "regret_score": 0.4807692307692308
     },
     "STRONG_BULL|NY_PM|NORMAL|WEAK_DOWN": {
@@ -1451,9 +1451,9 @@
         -0.02000000000000011,
         -0.020000000000000014
       ],
-      "missed_profitable": 80,
-      "missed_losing": 59,
-      "missed_total": 139,
+      "missed_profitable": 160,
+      "missed_losing": 118,
+      "missed_total": 278,
       "regret_score": 0.5755395683453237
     },
     "MILD_BULL|NY_OPEN|LOW|WEAK_UP": {
@@ -1471,9 +1471,9 @@
         -0.02000000000000005,
         -0.020000000000000073
       ],
-      "missed_profitable": 51,
-      "missed_losing": 38,
-      "missed_total": 89,
+      "missed_profitable": 102,
+      "missed_losing": 76,
+      "missed_total": 178,
       "regret_score": 0.5730337078651685
     },
     "STRONG_BULL|LONDON|LOW|WEAK_DOWN": {
@@ -1492,10 +1492,10 @@
         -0.020000000000000035,
         -0.019999999999999917
       ],
-      "missed_profitable": 106,
-      "missed_losing": 29,
-      "missed_total": 135,
-      "regret_score": 0.7851851851851852
+      "missed_profitable": 210,
+      "missed_losing": 59,
+      "missed_total": 269,
+      "regret_score": 0.7806691449814126
     },
     "MILD_BEAR|NY_OPEN|NORMAL|WEAK_UP": {
       "wins": 2,
@@ -1513,10 +1513,10 @@
         -0.01999999999999993,
         -0.01999999999999997
       ],
-      "missed_profitable": 119,
-      "missed_losing": 181,
-      "missed_total": 300,
-      "regret_score": 0.39666666666666667
+      "missed_profitable": 239,
+      "missed_losing": 362,
+      "missed_total": 601,
+      "regret_score": 0.39767054908485855
     },
     "STRONG_BULL|NY_OPEN|VERY_HIGH|WEAK_DOWN": {
       "wins": 0,
@@ -1533,9 +1533,9 @@
         -0.01999999999999995,
         -0.02000000000000002
       ],
-      "missed_profitable": 21,
-      "missed_losing": 19,
-      "missed_total": 40,
+      "missed_profitable": 42,
+      "missed_losing": 38,
+      "missed_total": 80,
       "regret_score": 0.525
     },
     "MILD_BEAR|NY_OPEN|HIGH|STRONG_UP": {
@@ -1553,9 +1553,9 @@
         -0.020000000000000094,
         -0.020000000000000025
       ],
-      "missed_profitable": 42,
-      "missed_losing": 70,
-      "missed_total": 112,
+      "missed_profitable": 84,
+      "missed_losing": 140,
+      "missed_total": 224,
       "regret_score": 0.375
     },
     "STRONG_BEAR|LONDON|LOW|STRONG_DOWN": {
@@ -1573,9 +1573,9 @@
         -0.020000000000000042,
         -0.019999999999999945
       ],
-      "missed_profitable": 40,
-      "missed_losing": 30,
-      "missed_total": 70,
+      "missed_profitable": 80,
+      "missed_losing": 60,
+      "missed_total": 140,
       "regret_score": 0.5714285714285714
     },
     "STRONG_BEAR|NY_PM|NORMAL|STRONG_DOWN": {
@@ -1601,9 +1601,9 @@
         -0.01999999999999997,
         -0.01999999999999999
       ],
-      "missed_profitable": 69,
-      "missed_losing": 68,
-      "missed_total": 137,
+      "missed_profitable": 138,
+      "missed_losing": 136,
+      "missed_total": 274,
       "regret_score": 0.5036496350364964
     },
     "STRONG_BEAR|NY_PM|LOW|WEAK_DOWN": {
@@ -1622,9 +1622,9 @@
         -0.020000000000000007,
         -0.019999999999999955
       ],
-      "missed_profitable": 103,
-      "missed_losing": 99,
-      "missed_total": 202,
+      "missed_profitable": 206,
+      "missed_losing": 198,
+      "missed_total": 404,
       "regret_score": 0.5099009900990099
     },
     "MILD_BEAR|LONDON|VERY_HIGH|STRONG_DOWN": {
@@ -1642,9 +1642,9 @@
         -0.02000000000000006,
         -0.020000000000000018
       ],
-      "missed_profitable": 13,
-      "missed_losing": 20,
-      "missed_total": 33,
+      "missed_profitable": 26,
+      "missed_losing": 40,
+      "missed_total": 66,
       "regret_score": 0.3939393939393939
     },
     "MILD_BULL|NY_PM|VERY_HIGH|STRONG_UP": {
@@ -1663,10 +1663,10 @@
         -0.020000000000000042,
         -0.020000000000000066
       ],
-      "missed_profitable": 16,
-      "missed_losing": 26,
-      "missed_total": 42,
-      "regret_score": 0.38095238095238093
+      "missed_profitable": 32,
+      "missed_losing": 53,
+      "missed_total": 85,
+      "regret_score": 0.3764705882352941
     },
     "STRONG_BULL|NY_OPEN|HIGH|WEAK_DOWN": {
       "wins": 0,
@@ -1683,9 +1683,9 @@
         -0.020000000000000052,
         -0.020000000000000084
       ],
-      "missed_profitable": 37,
-      "missed_losing": 14,
-      "missed_total": 51,
+      "missed_profitable": 74,
+      "missed_losing": 28,
+      "missed_total": 102,
       "regret_score": 0.7254901960784313
     },
     "STRONG_BEAR|NY_PM|LOW|STRONG_DOWN": {
@@ -1704,9 +1704,9 @@
         -0.02000000000000007,
         -0.019999999999999976
       ],
-      "missed_profitable": 24,
-      "missed_losing": 28,
-      "missed_total": 52,
+      "missed_profitable": 48,
+      "missed_losing": 56,
+      "missed_total": 104,
       "regret_score": 0.46153846153846156
     },
     "MILD_BEAR|LONDON|LOW|WEAK_DOWN": {
@@ -1725,9 +1725,9 @@
         -0.02000000000000001,
         -0.019999999999999997
       ],
-      "missed_profitable": 138,
-      "missed_losing": 276,
-      "missed_total": 414,
+      "missed_profitable": 276,
+      "missed_losing": 552,
+      "missed_total": 828,
       "regret_score": 0.3333333333333333
     },
     "STRONG_BULL|LONDON|NORMAL|WEAK_DOWN": {
@@ -1746,10 +1746,10 @@
         -0.020000000000000046,
         -0.02000000000000008
       ],
-      "missed_profitable": 66,
-      "missed_losing": 34,
-      "missed_total": 100,
-      "regret_score": 0.66
+      "missed_profitable": 136,
+      "missed_losing": 97,
+      "missed_total": 233,
+      "regret_score": 0.5836909871244635
     },
     "MILD_BULL|NY_OPEN|HIGH|WEAK_UP": {
       "wins": 2,
@@ -1772,9 +1772,9 @@
         -0.019999999999999962,
         -0.020000000000000052
       ],
-      "missed_profitable": 59,
-      "missed_losing": 69,
-      "missed_total": 128,
+      "missed_profitable": 118,
+      "missed_losing": 138,
+      "missed_total": 256,
       "regret_score": 0.4609375
     },
     "STRONG_BULL|LONDON|VERY_HIGH|STRONG_DOWN": {
@@ -1792,10 +1792,10 @@
         -0.020000000000000052,
         -0.02000000000000003
       ],
-      "missed_profitable": 2,
-      "missed_losing": 1,
-      "missed_total": 3,
-      "regret_score": 0.6666666666666666
+      "missed_profitable": 8,
+      "missed_losing": 2,
+      "missed_total": 10,
+      "regret_score": 0.8
     },
     "STRONG_BULL|NY_OPEN|NORMAL|WEAK_UP": {
       "wins": 1,
@@ -1817,10 +1817,10 @@
         -0.02000000000000005,
         -0.02000000000000003
       ],
-      "missed_profitable": 137,
-      "missed_losing": 46,
-      "missed_total": 183,
-      "regret_score": 0.7486338797814208
+      "missed_profitable": 274,
+      "missed_losing": 93,
+      "missed_total": 367,
+      "regret_score": 0.7465940054495913
     },
     "MILD_BULL|LONDON|LOW|STRONG_UP": {
       "wins": 1,
@@ -1838,10 +1838,10 @@
         -0.02000000000000004,
         -0.019999999999999987
       ],
-      "missed_profitable": 34,
-      "missed_losing": 35,
-      "missed_total": 69,
-      "regret_score": 0.4927536231884058
+      "missed_profitable": 69,
+      "missed_losing": 73,
+      "missed_total": 142,
+      "regret_score": 0.4859154929577465
     },
     "STRONG_BULL|NY_OPEN|VERY_HIGH|WEAK_UP": {
       "wins": 1,
@@ -1859,9 +1859,9 @@
         -0.01999999999999996,
         -0.02000000000000004
       ],
-      "missed_profitable": 29,
-      "missed_losing": 10,
-      "missed_total": 39,
+      "missed_profitable": 58,
+      "missed_losing": 20,
+      "missed_total": 78,
       "regret_score": 0.7435897435897436
     },
     "STRONG_BULL|NY_PM|HIGH|WEAK_UP": {
@@ -1882,9 +1882,9 @@
         -0.01999999999999994,
         -0.01999999999999996
       ],
-      "missed_profitable": 15,
-      "missed_losing": 5,
-      "missed_total": 20,
+      "missed_profitable": 30,
+      "missed_losing": 10,
+      "missed_total": 40,
       "regret_score": 0.75
     },
     "MILD_BULL|NY_PM|NORMAL|WEAK_UP": {
@@ -1903,9 +1903,9 @@
         -0.020000000000000007,
         -0.019999999999999945
       ],
-      "missed_profitable": 81,
-      "missed_losing": 92,
-      "missed_total": 173,
+      "missed_profitable": 162,
+      "missed_losing": 184,
+      "missed_total": 346,
       "regret_score": 0.4682080924855491
     },
     "STRONG_BULL|NY_OPEN|LOW|WEAK_UP": {
@@ -1923,9 +1923,9 @@
         -0.02000000000000007,
         -0.020000000000000028
       ],
-      "missed_profitable": 40,
-      "missed_losing": 21,
-      "missed_total": 61,
+      "missed_profitable": 80,
+      "missed_losing": 42,
+      "missed_total": 122,
       "regret_score": 0.6557377049180327
     },
     "MILD_BEAR|NY_OPEN|VERY_HIGH|STRONG_DOWN": {
@@ -1949,9 +1949,9 @@
         -0.02000000000000007,
         -0.020000000000000052
       ],
-      "missed_profitable": 35,
-      "missed_losing": 59,
-      "missed_total": 94,
+      "missed_profitable": 70,
+      "missed_losing": 118,
+      "missed_total": 188,
       "regret_score": 0.3723404255319149
     },
     "MILD_BEAR|LONDON|HIGH|STRONG_UP": {
@@ -1970,10 +1970,10 @@
         -0.020000000000000014,
         -0.020000000000000035
       ],
-      "missed_profitable": 3,
-      "missed_losing": 1,
-      "missed_total": 4,
-      "regret_score": 0.75
+      "missed_profitable": 17,
+      "missed_losing": 19,
+      "missed_total": 36,
+      "regret_score": 0.4722222222222222
     },
     "MILD_BEAR|NY_PM|NORMAL|STRONG_DOWN": {
       "wins": 3,
@@ -1993,9 +1993,9 @@
         -0.01999999999999999,
         -0.01999999999999999
       ],
-      "missed_profitable": 46,
-      "missed_losing": 79,
-      "missed_total": 125,
+      "missed_profitable": 92,
+      "missed_losing": 158,
+      "missed_total": 250,
       "regret_score": 0.368
     },
     "MILD_BULL|LONDON|VERY_HIGH|WEAK_UP": {
@@ -2011,10 +2011,10 @@
         -0.020000000000000025,
         -0.020000000000000056
       ],
-      "missed_profitable": 2,
+      "missed_profitable": 3,
       "missed_losing": 1,
-      "missed_total": 3,
-      "regret_score": 0.6666666666666666
+      "missed_total": 4,
+      "regret_score": 0.75
     },
     "STRONG_BEAR|LONDON|HIGH|WEAK_DOWN": {
       "wins": 3,
@@ -2037,10 +2037,10 @@
         -0.020000000000000004,
         -0.019999999999999987
       ],
-      "missed_profitable": 18,
-      "missed_losing": 8,
-      "missed_total": 26,
-      "regret_score": 0.6923076923076923
+      "missed_profitable": 39,
+      "missed_losing": 25,
+      "missed_total": 64,
+      "regret_score": 0.609375
     },
     "MILD_BEAR|LONDON|HIGH|WEAK_UP": {
       "wins": 3,
@@ -2063,9 +2063,9 @@
         -0.02000000000000002,
         -0.02000000000000001
       ],
-      "missed_profitable": 16,
-      "missed_losing": 35,
-      "missed_total": 51,
+      "missed_profitable": 32,
+      "missed_losing": 70,
+      "missed_total": 102,
       "regret_score": 0.3137254901960784
     },
     "MILD_BEAR|NY_OPEN|LOW|WEAK_DOWN": {
@@ -2084,10 +2084,10 @@
         -0.019999999999999983,
         -0.020000000000000025
       ],
-      "missed_profitable": 24,
-      "missed_losing": 24,
-      "missed_total": 48,
-      "regret_score": 0.5
+      "missed_profitable": 61,
+      "missed_losing": 75,
+      "missed_total": 136,
+      "regret_score": 0.4485294117647059
     },
     "MILD_BEAR|LONDON|LOW|STRONG_DOWN": {
       "wins": 2,
@@ -2105,9 +2105,9 @@
         -0.019999999999999973,
         -0.01999999999999997
       ],
-      "missed_profitable": 24,
-      "missed_losing": 46,
-      "missed_total": 70,
+      "missed_profitable": 48,
+      "missed_losing": 92,
+      "missed_total": 140,
       "regret_score": 0.34285714285714286
     },
     "STRONG_BEAR|NY_OPEN|HIGH|STRONG_DOWN": {
@@ -2131,10 +2131,10 @@
         -0.02000000000000007,
         -0.020000000000000084
       ],
-      "missed_profitable": 38,
-      "missed_losing": 14,
-      "missed_total": 52,
-      "regret_score": 0.7307692307692307
+      "missed_profitable": 77,
+      "missed_losing": 31,
+      "missed_total": 108,
+      "regret_score": 0.7129629629629629
     },
     "MILD_BEAR|NY_PM|VERY_HIGH|STRONG_DOWN": {
       "wins": 8,
@@ -2164,8 +2164,8 @@
         -0.019999999999999966
       ],
       "missed_profitable": 0,
-      "missed_losing": 15,
-      "missed_total": 15,
+      "missed_losing": 30,
+      "missed_total": 30,
       "regret_score": 0.0
     },
     "MILD_BULL|LONDON|HIGH|STRONG_DOWN": {
@@ -2209,10 +2209,10 @@
         -0.020000000000000007,
         -0.020000000000000073
       ],
-      "missed_profitable": 4,
-      "missed_losing": 8,
-      "missed_total": 12,
-      "regret_score": 0.3333333333333333
+      "missed_profitable": 29,
+      "missed_losing": 30,
+      "missed_total": 59,
+      "regret_score": 0.4915254237288136
     },
     "STRONG_BULL|NY_OPEN|VERY_HIGH|STRONG_UP": {
       "wins": 2,
@@ -2235,10 +2235,10 @@
         -0.020000000000000073,
         -0.020000000000000066
       ],
-      "missed_profitable": 47,
-      "missed_losing": 26,
-      "missed_total": 73,
-      "regret_score": 0.6438356164383562
+      "missed_profitable": 96,
+      "missed_losing": 65,
+      "missed_total": 161,
+      "regret_score": 0.5962732919254659
     },
     "MILD_BEAR|NY_OPEN|HIGH|WEAK_UP": {
       "wins": 4,
@@ -2261,9 +2261,9 @@
         -0.019999999999999945,
         -0.02000000000000009
       ],
-      "missed_profitable": 34,
-      "missed_losing": 75,
-      "missed_total": 109,
+      "missed_profitable": 68,
+      "missed_losing": 150,
+      "missed_total": 218,
       "regret_score": 0.3119266055045872
     },
     "STRONG_BULL|LONDON|NORMAL|STRONG_UP": {
@@ -2286,10 +2286,10 @@
         -0.02000000000000002,
         -0.020000000000000052
       ],
-      "missed_profitable": 33,
-      "missed_losing": 13,
-      "missed_total": 46,
-      "regret_score": 0.717391304347826
+      "missed_profitable": 69,
+      "missed_losing": 34,
+      "missed_total": 103,
+      "regret_score": 0.6699029126213593
     },
     "STRONG_BEAR|NY_OPEN|LOW|STRONG_DOWN": {
       "wins": 1,
@@ -2307,10 +2307,10 @@
         -0.020000000000000014,
         -0.02
       ],
-      "missed_profitable": 14,
-      "missed_losing": 12,
-      "missed_total": 26,
-      "regret_score": 0.5384615384615384
+      "missed_profitable": 28,
+      "missed_losing": 28,
+      "missed_total": 56,
+      "regret_score": 0.5
     },
     "MILD_BULL|LONDON|VERY_HIGH|WEAK_DOWN": {
       "wins": 6,
@@ -2337,9 +2337,9 @@
         -0.020000000000000077,
         -0.02000000000000009
       ],
-      "missed_profitable": 7,
-      "missed_losing": 12,
-      "missed_total": 19,
+      "missed_profitable": 14,
+      "missed_losing": 24,
+      "missed_total": 38,
       "regret_score": 0.3684210526315789
     },
     "MILD_BEAR|LONDON|VERY_HIGH|STRONG_UP": {
@@ -2360,10 +2360,10 @@
         -0.020000000000000014,
         -0.020000000000000007
       ],
-      "missed_profitable": 2,
+      "missed_profitable": 3,
       "missed_losing": 1,
-      "missed_total": 3,
-      "regret_score": 0.6666666666666666
+      "missed_total": 4,
+      "regret_score": 0.75
     },
     "MILD_BULL|NY_OPEN|LOW|STRONG_UP": {
       "wins": 0,
@@ -2380,9 +2380,9 @@
         -0.019999999999999966,
         -0.020000000000000042
       ],
-      "missed_profitable": 16,
-      "missed_losing": 16,
-      "missed_total": 32,
+      "missed_profitable": 32,
+      "missed_losing": 32,
+      "missed_total": 64,
       "regret_score": 0.5
     },
     "STRONG_BULL|LONDON|NORMAL|WEAK_UP": {
@@ -2405,10 +2405,10 @@
         -0.020000000000000014,
         -0.020000000000000042
       ],
-      "missed_profitable": 78,
-      "missed_losing": 35,
-      "missed_total": 113,
-      "regret_score": 0.6902654867256637
+      "missed_profitable": 157,
+      "missed_losing": 72,
+      "missed_total": 229,
+      "regret_score": 0.6855895196506551
     },
     "STRONG_BEAR|LONDON|VERY_HIGH|STRONG_UP": {
       "wins": 2,
@@ -2427,10 +2427,10 @@
         -0.019999999999999973,
         -0.019999999999999973
       ],
-      "missed_profitable": 18,
-      "missed_losing": 11,
-      "missed_total": 29,
-      "regret_score": 0.6206896551724138
+      "missed_profitable": 37,
+      "missed_losing": 21,
+      "missed_total": 58,
+      "regret_score": 0.6379310344827587
     },
     "STRONG_BEAR|LONDON|HIGH|STRONG_UP": {
       "wins": 2,
@@ -2449,10 +2449,10 @@
         -0.019999999999999955,
         -0.020000000000000046
       ],
-      "missed_profitable": 31,
-      "missed_losing": 15,
-      "missed_total": 46,
-      "regret_score": 0.6739130434782609
+      "missed_profitable": 61,
+      "missed_losing": 28,
+      "missed_total": 89,
+      "regret_score": 0.6853932584269663
     },
     "STRONG_BEAR|NY_OPEN|LOW|WEAK_UP": {
       "wins": 1,
@@ -2470,10 +2470,10 @@
         -0.01999999999999996,
         -0.020000000000000007
       ],
-      "missed_profitable": 45,
-      "missed_losing": 42,
-      "missed_total": 87,
-      "regret_score": 0.5172413793103449
+      "missed_profitable": 90,
+      "missed_losing": 85,
+      "missed_total": 175,
+      "regret_score": 0.5142857142857142
     },
     "STRONG_BEAR|NY_PM|NORMAL|WEAK_DOWN": {
       "wins": 4,
@@ -2496,9 +2496,9 @@
         -0.019999999999999993,
         -0.02000000000000003
       ],
-      "missed_profitable": 96,
-      "missed_losing": 113,
-      "missed_total": 209,
+      "missed_profitable": 192,
+      "missed_losing": 226,
+      "missed_total": 418,
       "regret_score": 0.45933014354066987
     },
     "MILD_BULL|NY_PM|NORMAL|STRONG_UP": {
@@ -2519,10 +2519,10 @@
         -0.01999999999999996,
         -0.02000000000000003
       ],
-      "missed_profitable": 51,
-      "missed_losing": 72,
-      "missed_total": 123,
-      "regret_score": 0.4146341463414634
+      "missed_profitable": 103,
+      "missed_losing": 144,
+      "missed_total": 247,
+      "regret_score": 0.41700404858299595
     },
     "MILD_BULL|NY_OPEN|VERY_HIGH|WEAK_DOWN": {
       "wins": 5,
@@ -2547,9 +2547,9 @@
         -0.01999999999999997,
         -0.019999999999999997
       ],
-      "missed_profitable": 28,
-      "missed_losing": 24,
-      "missed_total": 52,
+      "missed_profitable": 56,
+      "missed_losing": 48,
+      "missed_total": 104,
       "regret_score": 0.5384615384615384
     },
     "STRONG_BULL|NY_PM|VERY_HIGH|WEAK_UP": {
@@ -2564,9 +2564,9 @@
         -0.020000000000000004,
         -0.01999999999999997
       ],
-      "missed_profitable": 5,
+      "missed_profitable": 10,
       "missed_losing": 0,
-      "missed_total": 5,
+      "missed_total": 10,
       "regret_score": 1.0
     },
     "STRONG_BEAR|NY_OPEN|VERY_HIGH|WEAK_UP": {
@@ -2584,10 +2584,10 @@
         -0.01999999999999997,
         -0.01999999999999992
       ],
-      "missed_profitable": 24,
-      "missed_losing": 3,
-      "missed_total": 27,
-      "regret_score": 0.8888888888888888
+      "missed_profitable": 48,
+      "missed_losing": 8,
+      "missed_total": 56,
+      "regret_score": 0.8571428571428571
     },
     "STRONG_BEAR|NY_PM|VERY_HIGH|STRONG_DOWN": {
       "wins": 4,
@@ -2610,10 +2610,10 @@
         -0.019999999999999973,
         -0.019999999999999966
       ],
-      "missed_profitable": 26,
-      "missed_losing": 19,
-      "missed_total": 45,
-      "regret_score": 0.5777777777777777
+      "missed_profitable": 52,
+      "missed_losing": 39,
+      "missed_total": 91,
+      "regret_score": 0.5714285714285714
     },
     "STRONG_BULL|NY_PM|VERY_HIGH|STRONG_UP": {
       "wins": 0,
@@ -2630,9 +2630,9 @@
         -0.019999999999999983,
         -0.020000000000000052
       ],
-      "missed_profitable": 14,
-      "missed_losing": 15,
-      "missed_total": 29,
+      "missed_profitable": 28,
+      "missed_losing": 30,
+      "missed_total": 58,
       "regret_score": 0.4827586206896552
     },
     "STRONG_BULL|NY_PM|HIGH|STRONG_UP": {
@@ -2656,10 +2656,10 @@
         -0.020000000000000046,
         -0.01999999999999998
       ],
-      "missed_profitable": 17,
-      "missed_losing": 18,
-      "missed_total": 35,
-      "regret_score": 0.4857142857142857
+      "missed_profitable": 34,
+      "missed_losing": 37,
+      "missed_total": 71,
+      "regret_score": 0.4788732394366197
     },
     "STRONG_BEAR|LONDON|LOW|WEAK_UP": {
       "wins": 1,
@@ -2677,9 +2677,9 @@
         -0.02000000000000008,
         -0.019999999999999938
       ],
-      "missed_profitable": 178,
-      "missed_losing": 211,
-      "missed_total": 389,
+      "missed_profitable": 356,
+      "missed_losing": 422,
+      "missed_total": 778,
       "regret_score": 0.45758354755784064
     },
     "MILD_BEAR|NY_OPEN|VERY_HIGH|WEAK_UP": {
@@ -2703,9 +2703,9 @@
         -0.02000000000000005,
         -0.019999999999999945
       ],
-      "missed_profitable": 19,
-      "missed_losing": 36,
-      "missed_total": 55,
+      "missed_profitable": 38,
+      "missed_losing": 72,
+      "missed_total": 110,
       "regret_score": 0.34545454545454546
     },
     "STRONG_BEAR|NY_OPEN|VERY_HIGH|STRONG_UP": {
@@ -2723,9 +2723,9 @@
         -0.02000000000000005,
         -0.02000000000000003
       ],
-      "missed_profitable": 66,
-      "missed_losing": 73,
-      "missed_total": 139,
+      "missed_profitable": 132,
+      "missed_losing": 146,
+      "missed_total": 278,
       "regret_score": 0.4748201438848921
     },
     "STRONG_BULL|NY_OPEN|LOW|STRONG_UP": {
@@ -2739,9 +2739,9 @@
       "loss_pnls": [
         -0.0200000000000001
       ],
-      "missed_profitable": 10,
-      "missed_losing": 3,
-      "missed_total": 13,
+      "missed_profitable": 20,
+      "missed_losing": 6,
+      "missed_total": 26,
       "regret_score": 0.7692307692307693
     },
     "MILD_BEAR|NY_PM|HIGH|WEAK_UP": {
@@ -2760,9 +2760,9 @@
         -0.019999999999999962,
         -0.02000000000000006
       ],
-      "missed_profitable": 7,
-      "missed_losing": 19,
-      "missed_total": 26,
+      "missed_profitable": 14,
+      "missed_losing": 38,
+      "missed_total": 52,
       "regret_score": 0.2692307692307692
     },
     "STRONG_BULL|NY_OPEN|HIGH|STRONG_UP": {
@@ -2786,10 +2786,10 @@
         -0.02,
         -0.019999999999999955
       ],
-      "missed_profitable": 49,
-      "missed_losing": 24,
-      "missed_total": 73,
-      "regret_score": 0.6712328767123288
+      "missed_profitable": 99,
+      "missed_losing": 55,
+      "missed_total": 154,
+      "regret_score": 0.6428571428571429
     },
     "STRONG_BULL|NY_PM|NORMAL|STRONG_UP": {
       "wins": 1,
@@ -2807,10 +2807,10 @@
         -0.01999999999999996,
         -0.019999999999999983
       ],
-      "missed_profitable": 37,
-      "missed_losing": 17,
-      "missed_total": 54,
-      "regret_score": 0.6851851851851852
+      "missed_profitable": 74,
+      "missed_losing": 37,
+      "missed_total": 111,
+      "regret_score": 0.6666666666666666
     },
     "STRONG_BULL|NY_OPEN|NORMAL|WEAK_DOWN": {
       "wins": 0,
@@ -2827,10 +2827,10 @@
         -0.019999999999999962,
         -0.020000000000000073
       ],
-      "missed_profitable": 186,
-      "missed_losing": 41,
-      "missed_total": 227,
-      "regret_score": 0.8193832599118943
+      "missed_profitable": 380,
+      "missed_losing": 113,
+      "missed_total": 493,
+      "regret_score": 0.77079107505071
     },
     "MILD_BEAR|NY_PM|HIGH|WEAK_DOWN": {
       "wins": 5,
@@ -2855,9 +2855,9 @@
         -0.019999999999999966,
         -0.020000000000000035
       ],
-      "missed_profitable": 14,
-      "missed_losing": 24,
-      "missed_total": 38,
+      "missed_profitable": 28,
+      "missed_losing": 48,
+      "missed_total": 76,
       "regret_score": 0.3684210526315789
     },
     "MILD_BEAR|LONDON|HIGH|WEAK_DOWN": {
@@ -2881,9 +2881,9 @@
         -0.020000000000000018,
         -0.02000000000000004
       ],
-      "missed_profitable": 16,
-      "missed_losing": 29,
-      "missed_total": 45,
+      "missed_profitable": 32,
+      "missed_losing": 58,
+      "missed_total": 90,
       "regret_score": 0.35555555555555557
     },
     "STRONG_BEAR|NY_OPEN|HIGH|STRONG_UP": {
@@ -2901,9 +2901,9 @@
         -0.020000000000000028,
         -0.020000000000000087
       ],
-      "missed_profitable": 52,
-      "missed_losing": 44,
-      "missed_total": 96,
+      "missed_profitable": 104,
+      "missed_losing": 88,
+      "missed_total": 192,
       "regret_score": 0.5416666666666666
     },
     "STRONG_BULL|NY_OPEN|LOW|WEAK_DOWN": {
@@ -2922,9 +2922,9 @@
         -0.019999999999999962,
         -0.019999999999999983
       ],
-      "missed_profitable": 47,
-      "missed_losing": 29,
-      "missed_total": 76,
+      "missed_profitable": 94,
+      "missed_losing": 58,
+      "missed_total": 152,
       "regret_score": 0.618421052631579
     },
     "MILD_BULL|NY_PM|HIGH|WEAK_DOWN": {
@@ -2943,10 +2943,10 @@
         -0.020000000000000066,
         -0.020000000000000056
       ],
-      "missed_profitable": 5,
-      "missed_losing": 2,
-      "missed_total": 7,
-      "regret_score": 0.7142857142857143
+      "missed_profitable": 11,
+      "missed_losing": 6,
+      "missed_total": 17,
+      "regret_score": 0.6470588235294118
     },
     "STRONG_BULL|NY_PM|LOW|WEAK_UP": {
       "wins": 0,
@@ -2963,9 +2963,9 @@
         -0.01999999999999997,
         -0.020000000000000028
       ],
-      "missed_profitable": 65,
-      "missed_losing": 45,
-      "missed_total": 110,
+      "missed_profitable": 130,
+      "missed_losing": 90,
+      "missed_total": 220,
       "regret_score": 0.5909090909090909
     },
     "STRONG_BULL|NY_OPEN|HIGH|STRONG_DOWN": {
@@ -2983,9 +2983,9 @@
         -0.019999999999999983,
         -0.020000000000000115
       ],
-      "missed_profitable": 27,
-      "missed_losing": 20,
-      "missed_total": 47,
+      "missed_profitable": 54,
+      "missed_losing": 40,
+      "missed_total": 94,
       "regret_score": 0.574468085106383
     },
     "STRONG_BULL|LONDON|HIGH|STRONG_DOWN": {
@@ -3001,10 +3001,10 @@
         -0.019999999999999993,
         -0.019999999999999955
       ],
-      "missed_profitable": 3,
-      "missed_losing": 1,
-      "missed_total": 4,
-      "regret_score": 0.75
+      "missed_profitable": 12,
+      "missed_losing": 7,
+      "missed_total": 19,
+      "regret_score": 0.631578947368421
     },
     "MILD_BULL|NY_OPEN|VERY_HIGH|STRONG_DOWN": {
       "wins": 35,
@@ -3084,10 +3084,10 @@
         -0.01999999999999997,
         -0.019999999999999955
       ],
-      "missed_profitable": 8,
-      "missed_losing": 30,
-      "missed_total": 38,
-      "regret_score": 0.21052631578947367
+      "missed_profitable": 49,
+      "missed_losing": 75,
+      "missed_total": 124,
+      "regret_score": 0.3951612903225806
     },
     "STRONG_BEAR|NY_PM|NORMAL|WEAK_UP": {
       "wins": 0,
@@ -3104,9 +3104,9 @@
         -0.01999999999999995,
         -0.02000000000000006
       ],
-      "missed_profitable": 114,
-      "missed_losing": 113,
-      "missed_total": 227,
+      "missed_profitable": 228,
+      "missed_losing": 226,
+      "missed_total": 454,
       "regret_score": 0.5022026431718062
     },
     "MILD_BEAR|NY_OPEN|VERY_HIGH|WEAK_DOWN": {
@@ -3124,9 +3124,9 @@
         -0.02000000000000008,
         -0.01999999999999996
       ],
-      "missed_profitable": 18,
-      "missed_losing": 41,
-      "missed_total": 59,
+      "missed_profitable": 36,
+      "missed_losing": 82,
+      "missed_total": 118,
       "regret_score": 0.3050847457627119
     },
     "MILD_BEAR|NY_OPEN|LOW|STRONG_DOWN": {
@@ -3145,9 +3145,9 @@
         -0.019999999999999976,
         -0.01999999999999994
       ],
-      "missed_profitable": 17,
-      "missed_losing": 13,
-      "missed_total": 30,
+      "missed_profitable": 34,
+      "missed_losing": 26,
+      "missed_total": 60,
       "regret_score": 0.5666666666666667
     },
     "STRONG_BULL|LONDON|HIGH|STRONG_UP": {
@@ -3164,9 +3164,9 @@
         -0.019999999999999993,
         -0.020000000000000063
       ],
-      "missed_profitable": 20,
-      "missed_losing": 13,
-      "missed_total": 33,
+      "missed_profitable": 40,
+      "missed_losing": 26,
+      "missed_total": 66,
       "regret_score": 0.6060606060606061
     },
     "STRONG_BEAR|NY_OPEN|HIGH|WEAK_DOWN": {
@@ -3189,10 +3189,10 @@
         -0.020000000000000073,
         -0.019999999999999934
       ],
-      "missed_profitable": 44,
-      "missed_losing": 18,
-      "missed_total": 62,
-      "regret_score": 0.7096774193548387
+      "missed_profitable": 92,
+      "missed_losing": 62,
+      "missed_total": 154,
+      "regret_score": 0.5974025974025974
     },
     "STRONG_BULL|LONDON|VERY_HIGH|STRONG_UP": {
       "wins": 1,
@@ -3210,9 +3210,9 @@
         -0.020000000000000042,
         -0.020000000000000052
       ],
-      "missed_profitable": 12,
-      "missed_losing": 5,
-      "missed_total": 17,
+      "missed_profitable": 24,
+      "missed_losing": 10,
+      "missed_total": 34,
       "regret_score": 0.7058823529411765
     },
     "STRONG_BULL|LONDON|VERY_HIGH|WEAK_UP": {
@@ -3226,9 +3226,9 @@
       "loss_pnls": [
         -0.019999999999999973
       ],
-      "missed_profitable": 6,
-      "missed_losing": 1,
-      "missed_total": 7,
+      "missed_profitable": 12,
+      "missed_losing": 2,
+      "missed_total": 14,
       "regret_score": 0.8571428571428571
     },
     "STRONG_BEAR|NY_OPEN|VERY_HIGH|WEAK_DOWN": {
@@ -3252,9 +3252,9 @@
         -0.020000000000000046,
         -0.019999999999999987
       ],
-      "missed_profitable": 23,
-      "missed_losing": 7,
-      "missed_total": 30,
+      "missed_profitable": 46,
+      "missed_losing": 14,
+      "missed_total": 60,
       "regret_score": 0.7666666666666667
     },
     "STRONG_BULL|NY_OPEN|HIGH|WEAK_UP": {
@@ -3278,9 +3278,9 @@
         -0.02000000000000004,
         -0.02000000000000003
       ],
-      "missed_profitable": 53,
-      "missed_losing": 12,
-      "missed_total": 65,
+      "missed_profitable": 106,
+      "missed_losing": 24,
+      "missed_total": 130,
       "regret_score": 0.8153846153846154
     },
     "STRONG_BULL|NY_OPEN|VERY_HIGH|STRONG_DOWN": {
@@ -3298,9 +3298,9 @@
         -0.020000000000000007,
         -0.02000000000000005
       ],
-      "missed_profitable": 30,
-      "missed_losing": 17,
-      "missed_total": 47,
+      "missed_profitable": 60,
+      "missed_losing": 34,
+      "missed_total": 94,
       "regret_score": 0.6382978723404256
     },
     "STRONG_BULL|NY_PM|HIGH|WEAK_DOWN": {
@@ -3316,9 +3316,9 @@
         -0.020000000000000073,
         -0.01999999999999998
       ],
-      "missed_profitable": 6,
-      "missed_losing": 4,
-      "missed_total": 10,
+      "missed_profitable": 12,
+      "missed_losing": 8,
+      "missed_total": 20,
       "regret_score": 0.6
     },
     "MILD_BULL|NY_PM|VERY_HIGH|WEAK_DOWN": {
@@ -3335,9 +3335,9 @@
         -0.01999999999999997,
         -0.007946210268948595
       ],
-      "missed_profitable": 2,
-      "missed_losing": 1,
-      "missed_total": 3,
+      "missed_profitable": 4,
+      "missed_losing": 2,
+      "missed_total": 6,
       "regret_score": 0.6666666666666666
     },
     "STRONG_BULL|NY_PM|LOW|STRONG_UP": {
@@ -3355,9 +3355,9 @@
         -0.019999999999999997,
         -0.020000000000000077
       ],
-      "missed_profitable": 13,
-      "missed_losing": 13,
-      "missed_total": 26,
+      "missed_profitable": 26,
+      "missed_losing": 26,
+      "missed_total": 52,
       "regret_score": 0.5
     },
     "MILD_BEAR|NY_PM|VERY_HIGH|WEAK_DOWN": {
@@ -3376,9 +3376,9 @@
         -0.0200000000000001,
         -0.02
       ],
-      "missed_profitable": 4,
-      "missed_losing": 9,
-      "missed_total": 13,
+      "missed_profitable": 8,
+      "missed_losing": 18,
+      "missed_total": 26,
       "regret_score": 0.3076923076923077
     },
     "MILD_BULL|NY_PM|HIGH|WEAK_UP": {
@@ -3397,9 +3397,9 @@
         -0.020000000000000035,
         -0.019999999999999976
       ],
-      "missed_profitable": 8,
-      "missed_losing": 14,
-      "missed_total": 22,
+      "missed_profitable": 16,
+      "missed_losing": 28,
+      "missed_total": 44,
       "regret_score": 0.36363636363636365
     },
     "MILD_BULL|NY_PM|VERY_HIGH|WEAK_UP": {
@@ -3416,9 +3416,9 @@
         -0.020000000000000084,
         -0.019999999999999962
       ],
-      "missed_profitable": 1,
-      "missed_losing": 3,
-      "missed_total": 4,
+      "missed_profitable": 2,
+      "missed_losing": 6,
+      "missed_total": 8,
       "regret_score": 0.25
     },
     "STRONG_BEAR|NY_PM|VERY_HIGH|WEAK_UP": {
@@ -3436,9 +3436,9 @@
         -0.0200000000000001,
         -0.020000000000000125
       ],
-      "missed_profitable": 8,
-      "missed_losing": 3,
-      "missed_total": 11,
+      "missed_profitable": 16,
+      "missed_losing": 6,
+      "missed_total": 22,
       "regret_score": 0.7272727272727273
     },
     "MILD_BEAR|NY_PM|VERY_HIGH|WEAK_UP": {
@@ -3457,9 +3457,9 @@
         -0.02000000000000009,
         -0.020000000000000007
       ],
-      "missed_profitable": 3,
-      "missed_losing": 8,
-      "missed_total": 11,
+      "missed_profitable": 6,
+      "missed_losing": 16,
+      "missed_total": 22,
       "regret_score": 0.2727272727272727
     },
     "STRONG_BEAR|NY_PM|VERY_HIGH|WEAK_DOWN": {
@@ -3477,9 +3477,9 @@
         -0.02000000000000005,
         -0.020000000000000028
       ],
-      "missed_profitable": 12,
-      "missed_losing": 1,
-      "missed_total": 13,
+      "missed_profitable": 24,
+      "missed_losing": 2,
+      "missed_total": 26,
       "regret_score": 0.9230769230769231
     },
     "STRONG_BULL|NY_PM|VERY_HIGH|WEAK_DOWN": {
@@ -3493,9 +3493,9 @@
       "loss_pnls": [
         -0.020000000000000014
       ],
-      "missed_profitable": 3,
-      "missed_losing": 4,
-      "missed_total": 7,
+      "missed_profitable": 6,
+      "missed_losing": 8,
+      "missed_total": 14,
       "regret_score": 0.42857142857142855
     },
     "STRONG_BEAR|LONDON|VERY_HIGH|WEAK_DOWN": {
@@ -3513,9 +3513,9 @@
         -0.019999999999999983,
         -0.02000000000000001
       ],
-      "missed_profitable": 12,
-      "missed_losing": 5,
-      "missed_total": 17,
+      "missed_profitable": 24,
+      "missed_losing": 10,
+      "missed_total": 34,
       "regret_score": 0.7058823529411765
     },
     "STRONG_BULL|LONDON|HIGH|WEAK_UP": {
@@ -3531,9 +3531,9 @@
         -0.019999999999999976,
         -0.01999999999999998
       ],
-      "missed_profitable": 13,
-      "missed_losing": 7,
-      "missed_total": 20,
+      "missed_profitable": 26,
+      "missed_losing": 14,
+      "missed_total": 40,
       "regret_score": 0.65
     },
     "STRONG_BULL|LONDON|NORMAL|STRONG_DOWN": {
@@ -3545,10 +3545,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 22,
-      "missed_losing": 13,
-      "missed_total": 35,
-      "regret_score": 0.6285714285714286
+      "missed_profitable": 44,
+      "missed_losing": 29,
+      "missed_total": 73,
+      "regret_score": 0.6027397260273972
     },
     "MILD_BULL|NY_OPEN|NORMAL|STRONG_DOWN": {
       "wins": 0,
@@ -3559,10 +3559,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 59,
-      "missed_losing": 63,
-      "missed_total": 122,
-      "regret_score": 0.48360655737704916
+      "missed_profitable": 128,
+      "missed_losing": 129,
+      "missed_total": 257,
+      "regret_score": 0.4980544747081712
     },
     "STRONG_BULL|NY_OPEN|NORMAL|STRONG_DOWN": {
       "wins": 0,
@@ -3573,10 +3573,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 49,
-      "missed_losing": 19,
-      "missed_total": 68,
-      "regret_score": 0.7205882352941176
+      "missed_profitable": 98,
+      "missed_losing": 42,
+      "missed_total": 140,
+      "regret_score": 0.7
     },
     "MILD_BULL|LONDON|LOW|STRONG_DOWN": {
       "wins": 0,
@@ -3587,9 +3587,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 22,
-      "missed_losing": 29,
-      "missed_total": 51,
+      "missed_profitable": 44,
+      "missed_losing": 58,
+      "missed_total": 102,
       "regret_score": 0.43137254901960786
     },
     "MILD_BULL|NY_OPEN|LOW|STRONG_DOWN": {
@@ -3601,9 +3601,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 20,
-      "missed_losing": 11,
-      "missed_total": 31,
+      "missed_profitable": 40,
+      "missed_losing": 22,
+      "missed_total": 62,
       "regret_score": 0.6451612903225806
     },
     "STRONG_BULL|NY_PM|LOW|STRONG_DOWN": {
@@ -3615,9 +3615,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 12,
-      "missed_losing": 16,
-      "missed_total": 28,
+      "missed_profitable": 24,
+      "missed_losing": 32,
+      "missed_total": 56,
       "regret_score": 0.42857142857142855
     },
     "MILD_BULL|NY_PM|LOW|STRONG_DOWN": {
@@ -3629,9 +3629,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 20,
-      "missed_losing": 28,
-      "missed_total": 48,
+      "missed_profitable": 40,
+      "missed_losing": 56,
+      "missed_total": 96,
       "regret_score": 0.4166666666666667
     },
     "MILD_BEAR|NY_PM|LOW|WEAK_DOWN": {
@@ -3643,9 +3643,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 86,
-      "missed_losing": 143,
-      "missed_total": 229,
+      "missed_profitable": 172,
+      "missed_losing": 286,
+      "missed_total": 458,
       "regret_score": 0.37554585152838427
     },
     "MILD_BULL|NY_PM|LOW|WEAK_DOWN": {
@@ -3657,9 +3657,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 68,
-      "missed_losing": 104,
-      "missed_total": 172,
+      "missed_profitable": 136,
+      "missed_losing": 208,
+      "missed_total": 344,
       "regret_score": 0.3953488372093023
     },
     "MILD_BULL|LONDON|LOW|WEAK_DOWN": {
@@ -3671,10 +3671,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 254,
-      "missed_losing": 222,
-      "missed_total": 476,
-      "regret_score": 0.5336134453781513
+      "missed_profitable": 508,
+      "missed_losing": 449,
+      "missed_total": 957,
+      "regret_score": 0.5308254963427377
     },
     "MILD_BEAR|NY_PM|NORMAL|WEAK_UP": {
       "wins": 0,
@@ -3685,9 +3685,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 63,
-      "missed_losing": 128,
-      "missed_total": 191,
+      "missed_profitable": 126,
+      "missed_losing": 256,
+      "missed_total": 382,
       "regret_score": 0.3298429319371728
     },
     "MILD_BULL|NY_PM|LOW|WEAK_UP": {
@@ -3699,10 +3699,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 94,
-      "missed_losing": 114,
-      "missed_total": 208,
-      "regret_score": 0.4519230769230769
+      "missed_profitable": 188,
+      "missed_losing": 230,
+      "missed_total": 418,
+      "regret_score": 0.44976076555023925
     },
     "STRONG_BEAR|LONDON|LOW|STRONG_UP": {
       "wins": 0,
@@ -3713,9 +3713,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 32,
-      "missed_losing": 38,
-      "missed_total": 70,
+      "missed_profitable": 64,
+      "missed_losing": 76,
+      "missed_total": 140,
       "regret_score": 0.45714285714285713
     },
     "MILD_BULL|NY_PM|LOW|STRONG_UP": {
@@ -3727,9 +3727,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 29,
-      "missed_losing": 29,
-      "missed_total": 58,
+      "missed_profitable": 58,
+      "missed_losing": 58,
+      "missed_total": 116,
       "regret_score": 0.5
     },
     "MILD_BEAR|LONDON|LOW|WEAK_UP": {
@@ -3741,10 +3741,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 146,
-      "missed_losing": 254,
-      "missed_total": 400,
-      "regret_score": 0.365
+      "missed_profitable": 293,
+      "missed_losing": 509,
+      "missed_total": 802,
+      "regret_score": 0.3653366583541147
     },
     "MILD_BULL|NY_OPEN|LOW|WEAK_DOWN": {
       "wins": 0,
@@ -3755,10 +3755,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 51,
-      "missed_losing": 27,
-      "missed_total": 78,
-      "regret_score": 0.6538461538461539
+      "missed_profitable": 107,
+      "missed_losing": 69,
+      "missed_total": 176,
+      "regret_score": 0.6079545454545454
     },
     "MILD_BEAR|LONDON|NORMAL|STRONG_UP": {
       "wins": 0,
@@ -3769,10 +3769,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 80,
-      "missed_losing": 106,
-      "missed_total": 186,
-      "regret_score": 0.43010752688172044
+      "missed_profitable": 160,
+      "missed_losing": 214,
+      "missed_total": 374,
+      "regret_score": 0.42780748663101603
     },
     "STRONG_BEAR|LONDON|NORMAL|STRONG_UP": {
       "wins": 0,
@@ -3783,10 +3783,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 86,
-      "missed_losing": 26,
-      "missed_total": 112,
-      "regret_score": 0.7678571428571429
+      "missed_profitable": 179,
+      "missed_losing": 70,
+      "missed_total": 249,
+      "regret_score": 0.7188755020080321
     },
     "MILD_BULL|NY_PM|NORMAL|STRONG_DOWN": {
       "wins": 0,
@@ -3797,10 +3797,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 43,
-      "missed_losing": 32,
-      "missed_total": 75,
-      "regret_score": 0.5733333333333334
+      "missed_profitable": 93,
+      "missed_losing": 68,
+      "missed_total": 161,
+      "regret_score": 0.577639751552795
     },
     "STRONG_BULL|NY_PM|NORMAL|STRONG_DOWN": {
       "wins": 0,
@@ -3811,10 +3811,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 43,
-      "missed_losing": 27,
-      "missed_total": 70,
-      "regret_score": 0.6142857142857143
+      "missed_profitable": 84,
+      "missed_losing": 48,
+      "missed_total": 132,
+      "regret_score": 0.6363636363636364
     },
     "MILD_BEAR|NY_PM|LOW|WEAK_UP": {
       "wins": 0,
@@ -3825,9 +3825,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 68,
-      "missed_losing": 159,
-      "missed_total": 227,
+      "missed_profitable": 136,
+      "missed_losing": 318,
+      "missed_total": 454,
       "regret_score": 0.29955947136563876
     },
     "MILD_BEAR|NY_OPEN|NORMAL|STRONG_UP": {
@@ -3839,10 +3839,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 59,
-      "missed_losing": 94,
-      "missed_total": 153,
-      "regret_score": 0.38562091503267976
+      "missed_profitable": 119,
+      "missed_losing": 189,
+      "missed_total": 308,
+      "regret_score": 0.38636363636363635
     },
     "MILD_BEAR|NY_OPEN|LOW|WEAK_UP": {
       "wins": 0,
@@ -3853,10 +3853,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 36,
-      "missed_losing": 47,
-      "missed_total": 83,
-      "regret_score": 0.43373493975903615
+      "missed_profitable": 72,
+      "missed_losing": 95,
+      "missed_total": 167,
+      "regret_score": 0.4311377245508982
     },
     "STRONG_BEAR|NY_OPEN|LOW|STRONG_UP": {
       "wins": 0,
@@ -3867,9 +3867,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 21,
-      "missed_losing": 14,
-      "missed_total": 35,
+      "missed_profitable": 42,
+      "missed_losing": 28,
+      "missed_total": 70,
       "regret_score": 0.6
     },
     "MILD_BEAR|LONDON|LOW|STRONG_UP": {
@@ -3881,9 +3881,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 30,
-      "missed_losing": 39,
-      "missed_total": 69,
+      "missed_profitable": 60,
+      "missed_losing": 78,
+      "missed_total": 138,
       "regret_score": 0.43478260869565216
     },
     "STRONG_BEAR|NY_PM|LOW|WEAK_UP": {
@@ -3895,10 +3895,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 123,
-      "missed_losing": 59,
-      "missed_total": 182,
-      "regret_score": 0.6758241758241759
+      "missed_profitable": 245,
+      "missed_losing": 120,
+      "missed_total": 365,
+      "regret_score": 0.6712328767123288
     },
     "MILD_BEAR|NY_PM|LOW|STRONG_DOWN": {
       "wins": 0,
@@ -3909,9 +3909,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 20,
-      "missed_losing": 29,
-      "missed_total": 49,
+      "missed_profitable": 40,
+      "missed_losing": 58,
+      "missed_total": 98,
       "regret_score": 0.40816326530612246
     },
     "MILD_BEAR|NY_PM|NORMAL|STRONG_UP": {
@@ -3923,9 +3923,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 41,
-      "missed_losing": 82,
-      "missed_total": 123,
+      "missed_profitable": 82,
+      "missed_losing": 164,
+      "missed_total": 246,
       "regret_score": 0.3333333333333333
     },
     "MILD_BEAR|NY_PM|HIGH|STRONG_UP": {
@@ -3937,9 +3937,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 7,
-      "missed_losing": 40,
-      "missed_total": 47,
+      "missed_profitable": 14,
+      "missed_losing": 80,
+      "missed_total": 94,
       "regret_score": 0.14893617021276595
     },
     "MILD_BEAR|NY_PM|VERY_HIGH|STRONG_UP": {
@@ -3951,10 +3951,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 12,
-      "missed_losing": 13,
-      "missed_total": 25,
-      "regret_score": 0.48
+      "missed_profitable": 32,
+      "missed_losing": 44,
+      "missed_total": 76,
+      "regret_score": 0.42105263157894735
     },
     "MILD_BEAR|NY_OPEN|LOW|STRONG_UP": {
       "wins": 0,
@@ -3965,9 +3965,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 14,
-      "missed_losing": 7,
-      "missed_total": 21,
+      "missed_profitable": 28,
+      "missed_losing": 14,
+      "missed_total": 42,
       "regret_score": 0.6666666666666666
     },
     "MILD_BULL|LONDON|NORMAL|STRONG_DOWN": {
@@ -3979,10 +3979,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 46,
-      "missed_losing": 46,
-      "missed_total": 92,
-      "regret_score": 0.5
+      "missed_profitable": 132,
+      "missed_losing": 107,
+      "missed_total": 239,
+      "regret_score": 0.5523012552301255
     },
     "STRONG_BULL|LONDON|LOW|STRONG_DOWN": {
       "wins": 0,
@@ -3993,10 +3993,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 12,
-      "missed_losing": 4,
-      "missed_total": 16,
-      "regret_score": 0.75
+      "missed_profitable": 24,
+      "missed_losing": 9,
+      "missed_total": 33,
+      "regret_score": 0.7272727272727273
     },
     "STRONG_BULL|NY_OPEN|LOW|STRONG_DOWN": {
       "wins": 0,
@@ -4007,9 +4007,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 10,
-      "missed_losing": 4,
-      "missed_total": 14,
+      "missed_profitable": 20,
+      "missed_losing": 8,
+      "missed_total": 28,
       "regret_score": 0.7142857142857143
     },
     "MILD_BEAR|NY_PM|LOW|STRONG_UP": {
@@ -4021,9 +4021,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 28,
-      "missed_losing": 40,
-      "missed_total": 68,
+      "missed_profitable": 56,
+      "missed_losing": 80,
+      "missed_total": 136,
       "regret_score": 0.4117647058823529
     },
     "STRONG_BEAR|NY_PM|LOW|STRONG_UP": {
@@ -4035,9 +4035,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 30,
-      "missed_losing": 37,
-      "missed_total": 67,
+      "missed_profitable": 60,
+      "missed_losing": 74,
+      "missed_total": 134,
       "regret_score": 0.44776119402985076
     },
     "STRONG_BEAR|NY_OPEN|NORMAL|STRONG_UP": {
@@ -4049,10 +4049,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 94,
-      "missed_losing": 31,
-      "missed_total": 125,
-      "regret_score": 0.752
+      "missed_profitable": 193,
+      "missed_losing": 73,
+      "missed_total": 266,
+      "regret_score": 0.7255639097744361
     },
     "STRONG_BULL|NY_PM|LOW|WEAK_DOWN": {
       "wins": 0,
@@ -4063,9 +4063,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 59,
-      "missed_losing": 50,
-      "missed_total": 109,
+      "missed_profitable": 118,
+      "missed_losing": 100,
+      "missed_total": 218,
       "regret_score": 0.5412844036697247
     },
     "STRONG_BEAR|NY_PM|NORMAL|STRONG_UP": {
@@ -4077,9 +4077,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 64,
-      "missed_losing": 63,
-      "missed_total": 127,
+      "missed_profitable": 128,
+      "missed_losing": 126,
+      "missed_total": 254,
       "regret_score": 0.5039370078740157
     },
     "MILD_BULL|NY_PM|VERY_HIGH|STRONG_DOWN": {
@@ -4091,10 +4091,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 9,
-      "missed_losing": 4,
-      "missed_total": 13,
-      "regret_score": 0.6923076923076923
+      "missed_profitable": 13,
+      "missed_losing": 6,
+      "missed_total": 19,
+      "regret_score": 0.6842105263157895
     },
     "MILD_BULL|NY_PM|NORMAL|WEAK_DOWN": {
       "wins": 0,
@@ -4105,9 +4105,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 75,
-      "missed_losing": 99,
-      "missed_total": 174,
+      "missed_profitable": 150,
+      "missed_losing": 198,
+      "missed_total": 348,
       "regret_score": 0.43103448275862066
     },
     "STRONG_BEAR|NY_PM|VERY_HIGH|STRONG_UP": {
@@ -4119,10 +4119,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 35,
-      "missed_losing": 18,
-      "missed_total": 53,
-      "regret_score": 0.660377358490566
+      "missed_profitable": 69,
+      "missed_losing": 33,
+      "missed_total": 102,
+      "regret_score": 0.6764705882352942
     },
     "STRONG_BULL|NY_PM|HIGH|STRONG_DOWN": {
       "wins": 0,
@@ -4133,9 +4133,9 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 12,
-      "missed_losing": 2,
-      "missed_total": 14,
+      "missed_profitable": 24,
+      "missed_losing": 4,
+      "missed_total": 28,
       "regret_score": 0.8571428571428571
     },
     "STRONG_BEAR|NY_PM|HIGH|STRONG_UP": {
@@ -4147,10 +4147,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 34,
-      "missed_losing": 20,
-      "missed_total": 54,
-      "regret_score": 0.6296296296296297
+      "missed_profitable": 68,
+      "missed_losing": 33,
+      "missed_total": 101,
+      "regret_score": 0.6732673267326733
     },
     "MILD_BULL|NY_PM|HIGH|STRONG_DOWN": {
       "wins": 0,
@@ -4161,10 +4161,10 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 14,
-      "missed_losing": 18,
-      "missed_total": 32,
-      "regret_score": 0.4375
+      "missed_profitable": 28,
+      "missed_losing": 37,
+      "missed_total": 65,
+      "regret_score": 0.4307692307692308
     },
     "STRONG_BULL|NY_PM|VERY_HIGH|STRONG_DOWN": {
       "wins": 0,
@@ -4175,17 +4175,913 @@
       "avg_loss_pct": 0.0,
       "win_pnls": [],
       "loss_pnls": [],
-      "missed_profitable": 6,
-      "missed_losing": 6,
-      "missed_total": 12,
+      "missed_profitable": 12,
+      "missed_losing": 12,
+      "missed_total": 24,
       "regret_score": 0.5
+    },
+    "MILD_BEAR|OFF_HOURS|NORMAL|STRONG_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 91,
+      "missed_losing": 88,
+      "missed_total": 179,
+      "regret_score": 0.5083798882681564
+    },
+    "MILD_BEAR|OFF_HOURS|LOW|WEAK_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 353,
+      "missed_losing": 416,
+      "missed_total": 769,
+      "regret_score": 0.459037711313394
+    },
+    "STRONG_BULL|OFF_HOURS|LOW|WEAK_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 200,
+      "missed_losing": 88,
+      "missed_total": 288,
+      "regret_score": 0.6944444444444444
+    },
+    "STRONG_BULL|OFF_HOURS|LOW|STRONG_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 48,
+      "missed_losing": 55,
+      "missed_total": 103,
+      "regret_score": 0.46601941747572817
+    },
+    "MILD_BULL|OFF_HOURS|NORMAL|STRONG_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 91,
+      "missed_losing": 104,
+      "missed_total": 195,
+      "regret_score": 0.4666666666666667
+    },
+    "MILD_BULL|OFF_HOURS|NORMAL|WEAK_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 172,
+      "missed_losing": 151,
+      "missed_total": 323,
+      "regret_score": 0.5325077399380805
+    },
+    "STRONG_BULL|OFF_HOURS|NORMAL|WEAK_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 171,
+      "missed_losing": 58,
+      "missed_total": 229,
+      "regret_score": 0.7467248908296943
+    },
+    "STRONG_BULL|OFF_HOURS|LOW|STRONG_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 39,
+      "missed_losing": 40,
+      "missed_total": 79,
+      "regret_score": 0.4936708860759494
+    },
+    "STRONG_BEAR|OFF_HOURS|NORMAL|WEAK_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 260,
+      "missed_losing": 107,
+      "missed_total": 367,
+      "regret_score": 0.7084468664850136
+    },
+    "MILD_BEAR|OFF_HOURS|LOW|STRONG_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 112,
+      "missed_losing": 110,
+      "missed_total": 222,
+      "regret_score": 0.5045045045045045
+    },
+    "MILD_BEAR|OFF_HOURS|LOW|STRONG_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 86,
+      "missed_losing": 108,
+      "missed_total": 194,
+      "regret_score": 0.44329896907216493
+    },
+    "MILD_BULL|OFF_HOURS|NORMAL|STRONG_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 97,
+      "missed_losing": 98,
+      "missed_total": 195,
+      "regret_score": 0.49743589743589745
+    },
+    "MILD_BULL|OFF_HOURS|LOW|STRONG_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 66,
+      "missed_losing": 72,
+      "missed_total": 138,
+      "regret_score": 0.4782608695652174
+    },
+    "STRONG_BEAR|OFF_HOURS|NORMAL|STRONG_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 133,
+      "missed_losing": 98,
+      "missed_total": 231,
+      "regret_score": 0.5757575757575758
+    },
+    "MILD_BEAR|OFF_HOURS|HIGH|WEAK_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 14,
+      "missed_losing": 14,
+      "missed_total": 28,
+      "regret_score": 0.5
+    },
+    "STRONG_BEAR|OFF_HOURS|HIGH|WEAK_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 23,
+      "missed_losing": 13,
+      "missed_total": 36,
+      "regret_score": 0.6388888888888888
+    },
+    "STRONG_BEAR|OFF_HOURS|NORMAL|WEAK_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 239,
+      "missed_losing": 114,
+      "missed_total": 353,
+      "regret_score": 0.6770538243626062
+    },
+    "STRONG_BEAR|OFF_HOURS|VERY_HIGH|STRONG_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 33,
+      "missed_losing": 13,
+      "missed_total": 46,
+      "regret_score": 0.717391304347826
+    },
+    "STRONG_BULL|OFF_HOURS|LOW|WEAK_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 217,
+      "missed_losing": 168,
+      "missed_total": 385,
+      "regret_score": 0.5636363636363636
+    },
+    "STRONG_BULL|OFF_HOURS|NORMAL|WEAK_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 136,
+      "missed_losing": 52,
+      "missed_total": 188,
+      "regret_score": 0.723404255319149
+    },
+    "MILD_BULL|OFF_HOURS|HIGH|WEAK_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 2,
+      "missed_losing": 1,
+      "missed_total": 3,
+      "regret_score": 0.6666666666666666
+    },
+    "STRONG_BULL|OFF_HOURS|VERY_HIGH|STRONG_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 21,
+      "missed_losing": 3,
+      "missed_total": 24,
+      "regret_score": 0.875
+    },
+    "MILD_BEAR|OFF_HOURS|VERY_HIGH|STRONG_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 6,
+      "missed_losing": 18,
+      "missed_total": 24,
+      "regret_score": 0.25
+    },
+    "MILD_BEAR|OFF_HOURS|NORMAL|WEAK_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 99,
+      "missed_losing": 138,
+      "missed_total": 237,
+      "regret_score": 0.4177215189873418
+    },
+    "STRONG_BEAR|OFF_HOURS|LOW|WEAK_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 448,
+      "missed_losing": 338,
+      "missed_total": 786,
+      "regret_score": 0.5699745547073791
+    },
+    "MILD_BEAR|OFF_HOURS|NORMAL|STRONG_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 136,
+      "missed_losing": 194,
+      "missed_total": 330,
+      "regret_score": 0.4121212121212121
+    },
+    "STRONG_BEAR|OFF_HOURS|LOW|STRONG_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 87,
+      "missed_losing": 45,
+      "missed_total": 132,
+      "regret_score": 0.6590909090909091
+    },
+    "STRONG_BEAR|OFF_HOURS|LOW|WEAK_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 439,
+      "missed_losing": 140,
+      "missed_total": 579,
+      "regret_score": 0.7582037996545768
+    },
+    "STRONG_BULL|OFF_HOURS|HIGH|WEAK_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 27,
+      "missed_losing": 10,
+      "missed_total": 37,
+      "regret_score": 0.7297297297297297
+    },
+    "STRONG_BEAR|OFF_HOURS|VERY_HIGH|WEAK_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 13,
+      "missed_losing": 8,
+      "missed_total": 21,
+      "regret_score": 0.6190476190476191
+    },
+    "STRONG_BEAR|OFF_HOURS|LOW|STRONG_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 152,
+      "missed_losing": 123,
+      "missed_total": 275,
+      "regret_score": 0.5527272727272727
+    },
+    "MILD_BEAR|OFF_HOURS|HIGH|STRONG_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 36,
+      "missed_losing": 57,
+      "missed_total": 93,
+      "regret_score": 0.3870967741935484
+    },
+    "STRONG_BEAR|OFF_HOURS|HIGH|STRONG_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 45,
+      "missed_losing": 35,
+      "missed_total": 80,
+      "regret_score": 0.5625
+    },
+    "MILD_BEAR|OFF_HOURS|NORMAL|WEAK_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 207,
+      "missed_losing": 277,
+      "missed_total": 484,
+      "regret_score": 0.42768595041322316
+    },
+    "MILD_BULL|OFF_HOURS|LOW|STRONG_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 75,
+      "missed_losing": 79,
+      "missed_total": 154,
+      "regret_score": 0.487012987012987
+    },
+    "STRONG_BEAR|OFF_HOURS|NORMAL|STRONG_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 165,
+      "missed_losing": 98,
+      "missed_total": 263,
+      "regret_score": 0.6273764258555133
+    },
+    "MILD_BULL|OFF_HOURS|NORMAL|WEAK_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 133,
+      "missed_losing": 151,
+      "missed_total": 284,
+      "regret_score": 0.46830985915492956
+    },
+    "STRONG_BULL|OFF_HOURS|HIGH|STRONG_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 23,
+      "missed_losing": 22,
+      "missed_total": 45,
+      "regret_score": 0.5111111111111111
+    },
+    "MILD_BULL|OFF_HOURS|HIGH|STRONG_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 18,
+      "missed_losing": 21,
+      "missed_total": 39,
+      "regret_score": 0.46153846153846156
+    },
+    "STRONG_BULL|OFF_HOURS|HIGH|STRONG_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 18,
+      "missed_losing": 20,
+      "missed_total": 38,
+      "regret_score": 0.47368421052631576
+    },
+    "MILD_BEAR|OFF_HOURS|LOW|WEAK_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 328,
+      "missed_losing": 452,
+      "missed_total": 780,
+      "regret_score": 0.4205128205128205
+    },
+    "STRONG_BULL|OFF_HOURS|NORMAL|STRONG_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 55,
+      "missed_losing": 35,
+      "missed_total": 90,
+      "regret_score": 0.6111111111111112
+    },
+    "STRONG_BULL|OFF_HOURS|NORMAL|STRONG_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 85,
+      "missed_losing": 37,
+      "missed_total": 122,
+      "regret_score": 0.6967213114754098
+    },
+    "MILD_BULL|OFF_HOURS|LOW|WEAK_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 271,
+      "missed_losing": 389,
+      "missed_total": 660,
+      "regret_score": 0.4106060606060606
+    },
+    "STRONG_BEAR|OFF_HOURS|HIGH|STRONG_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 46,
+      "missed_losing": 28,
+      "missed_total": 74,
+      "regret_score": 0.6216216216216216
+    },
+    "STRONG_BEAR|OFF_HOURS|VERY_HIGH|STRONG_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 39,
+      "missed_losing": 35,
+      "missed_total": 74,
+      "regret_score": 0.527027027027027
+    },
+    "MILD_BULL|OFF_HOURS|LOW|WEAK_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 284,
+      "missed_losing": 379,
+      "missed_total": 663,
+      "regret_score": 0.42835595776772245
+    },
+    "MILD_BEAR|OFF_HOURS|HIGH|STRONG_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 14,
+      "missed_losing": 24,
+      "missed_total": 38,
+      "regret_score": 0.3684210526315789
+    },
+    "MILD_BULL|OFF_HOURS|VERY_HIGH|STRONG_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 32,
+      "missed_losing": 25,
+      "missed_total": 57,
+      "regret_score": 0.5614035087719298
+    },
+    "MILD_BULL|OFF_HOURS|VERY_HIGH|WEAK_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 3,
+      "missed_losing": 0,
+      "missed_total": 3,
+      "regret_score": 1.0
+    },
+    "MILD_BULL|OFF_HOURS|HIGH|STRONG_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 30,
+      "missed_losing": 28,
+      "missed_total": 58,
+      "regret_score": 0.5172413793103449
+    },
+    "MILD_BULL|OFF_HOURS|HIGH|WEAK_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 23,
+      "missed_losing": 19,
+      "missed_total": 42,
+      "regret_score": 0.5476190476190477
+    },
+    "STRONG_BULL|OFF_HOURS|HIGH|WEAK_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 19,
+      "missed_losing": 7,
+      "missed_total": 26,
+      "regret_score": 0.7307692307692307
+    },
+    "STRONG_BEAR|OFF_HOURS|HIGH|WEAK_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 38,
+      "missed_losing": 17,
+      "missed_total": 55,
+      "regret_score": 0.6909090909090909
+    },
+    "STRONG_BULL|OFF_HOURS|VERY_HIGH|WEAK_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 4,
+      "missed_losing": 1,
+      "missed_total": 5,
+      "regret_score": 0.8
+    },
+    "MILD_BULL|OFF_HOURS|VERY_HIGH|WEAK_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 3,
+      "missed_losing": 0,
+      "missed_total": 3,
+      "regret_score": 1.0
+    },
+    "MILD_BEAR|OFF_HOURS|VERY_HIGH|STRONG_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 33,
+      "missed_losing": 29,
+      "missed_total": 62,
+      "regret_score": 0.532258064516129
+    },
+    "MILD_BULL|OFF_HOURS|VERY_HIGH|STRONG_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 12,
+      "missed_losing": 22,
+      "missed_total": 34,
+      "regret_score": 0.35294117647058826
+    },
+    "MILD_BEAR|OFF_HOURS|HIGH|WEAK_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 5,
+      "missed_losing": 2,
+      "missed_total": 7,
+      "regret_score": 0.7142857142857143
+    },
+    "MILD_BEAR|OFF_HOURS|VERY_HIGH|WEAK_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 7,
+      "missed_losing": 6,
+      "missed_total": 13,
+      "regret_score": 0.5384615384615384
+    },
+    "STRONG_BEAR|OFF_HOURS|VERY_HIGH|WEAK_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 16,
+      "missed_losing": 4,
+      "missed_total": 20,
+      "regret_score": 0.8
+    },
+    "STRONG_BULL|OFF_HOURS|VERY_HIGH|STRONG_UP": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 9,
+      "missed_losing": 7,
+      "missed_total": 16,
+      "regret_score": 0.5625
+    },
+    "MILD_BEAR|OFF_HOURS|VERY_HIGH|WEAK_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 7,
+      "missed_losing": 7,
+      "missed_total": 14,
+      "regret_score": 0.5
+    },
+    "STRONG_BULL|OFF_HOURS|VERY_HIGH|WEAK_DOWN": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "total_pnl_pct": 0.0,
+      "avg_win_pct": 0.0,
+      "avg_loss_pct": 0.0,
+      "win_pnls": [],
+      "loss_pnls": [],
+      "missed_profitable": 4,
+      "missed_losing": 0,
+      "missed_total": 4,
+      "regret_score": 1.0
     }
   },
   "total_trades": 1245,
   "total_wins": 378,
   "meta": {
     "created": "2026-04-08T17:42:38.175884+00:00",
-    "last_updated": "2026-04-08T17:57:58.575204+00:00",
+    "last_updated": "2026-04-08T22:39:49.973906+00:00",
     "training_bars": 49576
   }
 }
