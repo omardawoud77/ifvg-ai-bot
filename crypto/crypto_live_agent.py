@@ -173,7 +173,11 @@ def main():
     log.info(f"   Hard SL:   {SL_PCT*100}%")
     log.info(f"   Model:     {MODEL_PATH}")
 
-    # Single client — spot mainnet for data, futures testnet for trades
+    # Two clients: one for mainnet futures data, one for testnet execution
+    # data_client uses default mainnet futures endpoint (fapi.binance.com)
+    data_client = Client(api_key, api_secret, requests_params={"timeout": 20})
+
+    # client is for testnet execution only
     client = Client(api_key, api_secret, requests_params={"timeout": 20})
     client.ping = lambda: None  # skip geo-blocked spot ping
     client.FUTURES_URL = FUTURES_TESTNET_URL
@@ -221,7 +225,7 @@ def main():
                 log.error(f"🛑 Loss limit hit: ${state['total_pnl_usdt']:.2f} < ${DAILY_LOSS_LIMIT:.2f}. Shutting down.")
                 return
 
-            df = fetch_mtf(client, SYMBOL, bars=200)
+            df = fetch_mtf(data_client, SYMBOL, bars=200)
             if len(df) < MIN_BARS:
                 log.warning(f"Not enough bars ({len(df)} < {MIN_BARS})")
                 time.sleep(FETCH_EVERY)
