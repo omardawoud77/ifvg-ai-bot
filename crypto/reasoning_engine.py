@@ -156,20 +156,20 @@ def interpret(perception):
         conditions['volatility'] = 'LOW'
         narrative.append(f"Low volatility: ATR {atr:.2%}")
 
-    # Session
+    # Session — labels preserved as memory bucket keys, no quality differentiation
     hour = perception['hour']
     if 7 <= hour <= 11:
         conditions['session'] = 'LONDON'
-        narrative.append("London session — high liquidity")
+        narrative.append("London session")
     elif 12 <= hour <= 16:
         conditions['session'] = 'NY_OPEN'
-        narrative.append("New York open — peak liquidity")
+        narrative.append("New York open")
     elif 17 <= hour <= 20:
         conditions['session'] = 'NY_PM'
         narrative.append("New York afternoon")
     else:
         conditions['session'] = 'OFF_HOURS'
-        narrative.append("Asia session — crypto trades 24/7")
+        narrative.append("Asia session")
 
     return conditions, narrative
 
@@ -238,10 +238,8 @@ def reason(ppo_action, conditions, perception, memory):
             evidence_against.append("Low volume — weak conviction")
             confidence -= 0.10
 
-        # Session — crypto markets run 24/7, no off-hours penalty
-        if conditions['session'] in ['LONDON', 'NY_OPEN']:
-            evidence_for.append("High-quality session")
-            confidence += 0.08
+        # Session — no boost or penalty; all sessions evaluated equally.
+        # Session label is still part of conditions for memory bucket keys.
 
         # Volatility
         if conditions['volatility'] == 'HIGH':

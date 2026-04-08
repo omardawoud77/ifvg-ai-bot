@@ -76,10 +76,6 @@ def run_regret_training(df, model, memory):
             i += 1
             continue
 
-        if conditions['session'] == 'OFF_HOURS':
-            i += 1
-            continue
-
         try:
             verdict, confidence, reasoning_text = decide(
                 action, conditions, perception, memory, narrative
