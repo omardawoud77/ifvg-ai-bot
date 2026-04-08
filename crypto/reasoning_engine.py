@@ -169,7 +169,7 @@ def interpret(perception):
         narrative.append("New York afternoon")
     else:
         conditions['session'] = 'OFF_HOURS'
-        narrative.append("Off-hours — low liquidity")
+        narrative.append("Asia session — crypto trades 24/7")
 
     return conditions, narrative
 
@@ -238,13 +238,10 @@ def reason(ppo_action, conditions, perception, memory):
             evidence_against.append("Low volume — weak conviction")
             confidence -= 0.10
 
-        # Session
+        # Session — crypto markets run 24/7, no off-hours penalty
         if conditions['session'] in ['LONDON', 'NY_OPEN']:
             evidence_for.append("High-quality session")
             confidence += 0.08
-        elif conditions['session'] == 'OFF_HOURS':
-            evidence_against.append("Off-hours — avoid new entries")
-            confidence -= 0.15
 
         # Volatility
         if conditions['volatility'] == 'HIGH':
