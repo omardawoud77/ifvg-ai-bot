@@ -33,6 +33,8 @@ TRADE_NOTIONAL  = 110.0          # USDT notional per trade
 LEVERAGE        = 1              # 1× — no margin risk
 FETCH_EVERY     = 300            # seconds between bar checks (5 min)
 SL_PCT          = 0.02           # 2% hard stop
+DAILY_LOSS_LIMIT = -20.0         # USD — stop trading if total loss exceeds this
+MAX_DAILY_TRADES = 6             # max NEW entries per UTC day
 MODEL_PATH      = "crypto_mtf_best.zip"
 LOG_PATH        = "crypto_live_agent.log"
 STATE_PATH      = "crypto_live_state.json"
@@ -65,6 +67,8 @@ def load_state():
         "wins": 0,
         "losses": 0,
         "total_pnl_usdt": 0.0,
+        "daily_trades": 0,
+        "last_trade_date": None,
     }
 
 def save_state(state):
@@ -211,6 +215,11 @@ def main():
 
     while True:
         try:
+            # Daily loss limit kill switch
+            if state['total_pnl_usdt'] < DAILY_LOSS_LIMIT:
+                log.error(f"🛑 Loss limit hit: ${state['total_pnl_usdt']:.2f} < ${DAILY_LOSS_LIMIT:.2f}. Shutting down.")
+                return
+
             df = fetch_mtf(client, SYMBOL, bars=200)
             if len(df) < MIN_BARS:
                 log.warning(f"Not enough bars ({len(df)} < {MIN_BARS})")
@@ -225,6 +234,33 @@ def main():
             last_bar_time = latest_bar_time
             current_price = float(df['close'].iloc[-2])
             log.info(f"\n📊 New bar: {latest_bar_time} | Close: ${current_price:,.0f}")
+
+            # Reconcile local state with exchange position
+            try:
+                pos_info = client.futures_position_information(symbol=SYMBOL)
+                exchange_qty = float(pos_info[0]['positionAmt'])
+                if exchange_qty == 0 and state['position'] != 0:
+                    log.warning(f"⚠️  Exchange flat but state={state['position']} — SL likely fired, resyncing")
+                    # Approximate PnL (use current price as exit since we don't know exact stop fill)
+                    pnl_pct = (current_price - state['entry_price']) / state['entry_price'] * state['position']
+                    pnl_usdt = pnl_pct * TRADE_NOTIONAL
+                    state['total_pnl_usdt'] += pnl_usdt
+                    if pnl_pct > 0:
+                        state['wins'] += 1
+                    else:
+                        state['losses'] += 1
+                    state['position'] = 0
+                    state['entry_price'] = 0.0
+                    state['entry_time'] = None
+                    state['qty'] = 0.0
+                    save_state(state)
+                elif exchange_qty != 0 and state['position'] == 0:
+                    log.warning(f"⚠️  Exchange has qty={exchange_qty} but state=flat — manual resolution needed")
+                    log.warning("   Skipping this bar to avoid double-trading")
+                    time.sleep(FETCH_EVERY)
+                    continue
+            except Exception as e:
+                log.error(f"❌ Position reconcile failed: {e}")
 
             # Build observation
             env = CryptoMTFEnv(df.iloc[:-1].reset_index(drop=True))
@@ -257,8 +293,17 @@ def main():
             action_names = {0: "HOLD", 1: "BUY (long)", 2: "SELL (short)", 3: "CLOSE"}
             log.info(f"🤖 Decision: {action_names[action]} | Position: {state['position']}")
 
+            # ── Daily trade limit gate (entries only — closes always allowed) ─
+            today = datetime.now(timezone.utc).date().isoformat()
+            if state.get('last_trade_date') != today:
+                state['daily_trades'] = 0
+                state['last_trade_date'] = today
+            entries_allowed = state['daily_trades'] < MAX_DAILY_TRADES
+            if not entries_allowed and state['position'] == 0 and action in (1, 2):
+                log.warning(f"⏸️  Daily trade limit reached ({state['daily_trades']}/{MAX_DAILY_TRADES}) — skip entry")
+
             # ── Execute ────────────────────────────────────────────────
-            if state['position'] == 0:
+            if state['position'] == 0 and entries_allowed:
                 if action == 1:  # open LONG
                     order, qty = open_long(client, SYMBOL, TRADE_NOTIONAL, current_price,
                                            step_size, min_qty, qty_prec)
@@ -268,8 +313,22 @@ def main():
                         state['entry_time'] = datetime.now(timezone.utc).isoformat()
                         state['qty'] = qty
                         state['trade_count'] += 1
+                        state['daily_trades'] += 1
                         save_state(state)  # save IMMEDIATELY after fill
                         log.info(f"📈 LONG opened | qty={qty} @ ${current_price:,.0f}")
+                        # Place exchange stop-market — instant SL, no polling required
+                        try:
+                            sl_price = round(current_price * (1 - SL_PCT), 1)
+                            client.futures_create_order(
+                                symbol=SYMBOL,
+                                side="SELL",
+                                type="STOP_MARKET",
+                                stopPrice=sl_price,
+                                closePosition="true",
+                            )
+                            log.info(f"🛡️  Exchange SL placed @ ${sl_price:,.1f}")
+                        except Exception as e:
+                            log.error(f"❌ SL placement failed: {e}")
 
                 elif action == 2:  # open SHORT
                     order, qty = open_short(client, SYMBOL, TRADE_NOTIONAL, current_price,
@@ -280,8 +339,22 @@ def main():
                         state['entry_time'] = datetime.now(timezone.utc).isoformat()
                         state['qty'] = qty
                         state['trade_count'] += 1
+                        state['daily_trades'] += 1
                         save_state(state)
                         log.info(f"📉 SHORT opened | qty={qty} @ ${current_price:,.0f}")
+                        # Place exchange stop-market — instant SL, no polling required
+                        try:
+                            sl_price = round(current_price * (1 + SL_PCT), 1)
+                            client.futures_create_order(
+                                symbol=SYMBOL,
+                                side="BUY",
+                                type="STOP_MARKET",
+                                stopPrice=sl_price,
+                                closePosition="true",
+                            )
+                            log.info(f"🛡️  Exchange SL placed @ ${sl_price:,.1f}")
+                        except Exception as e:
+                            log.error(f"❌ SL placement failed: {e}")
 
             else:  # in a position
                 # Hard SL check
