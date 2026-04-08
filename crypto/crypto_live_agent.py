@@ -26,14 +26,14 @@ from binance.client import Client
 from binance.exceptions import BinanceAPIException
 from stable_baselines3 import PPO
 from crypto_env_v2 import CryptoMTFEnv
+from reasoning_engine import perceive, interpret, decide, get_dynamic_sl_tp
+from trade_memory import TradeMemory
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 SYMBOL          = "BTCUSDT"
-TRADE_NOTIONAL  = 110.0          # USDT notional per trade
-LEVERAGE        = 1              # 1× — no margin risk
+TRADE_NOTIONAL  = 1500.0         # USDT notional per trade
+LEVERAGE        = 3              # 3× leverage
 FETCH_EVERY     = 300            # seconds between bar checks (5 min)
-SL_PCT          = 0.02           # 2% hard stop
-DAILY_LOSS_LIMIT = -20.0         # USD — stop trading if total loss exceeds this
 MAX_DAILY_TRADES = 6             # max NEW entries per UTC day
 MODEL_PATH      = "crypto_mtf_best.zip"
 LOG_PATH        = "crypto_live_agent.log"
@@ -54,26 +54,47 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 # ── State ──────────────────────────────────────────────────────────────────────
+DEFAULT_STATE = {
+    "position": 0,
+    "entry_price": 0.0,
+    "entry_time": None,
+    "qty": 0.0,
+    "trade_count": 0,
+    "wins": 0,
+    "losses": 0,
+    "total_pnl_usdt": 0.0,
+    "daily_trades": 0,
+    "last_trade_date": None,
+    "sl_pct": 0.02,
+    "tp_pct": 0.04,
+    "entry_conditions": None,
+    "entry_confidence": 0.5,
+    "entry_verdict": None,
+    "entry_reasoning": "",
+}
+
 def load_state():
     if os.path.exists(STATE_PATH):
         with open(STATE_PATH) as f:
-            return json.load(f)
-    return {
-        "position": 0,
-        "entry_price": 0.0,
-        "entry_time": None,
-        "qty": 0.0,
-        "trade_count": 0,
-        "wins": 0,
-        "losses": 0,
-        "total_pnl_usdt": 0.0,
-        "daily_trades": 0,
-        "last_trade_date": None,
-    }
+            loaded = json.load(f)
+        # Migrate: ensure all default keys exist
+        for k, v in DEFAULT_STATE.items():
+            loaded.setdefault(k, v)
+        return loaded
+    return dict(DEFAULT_STATE)
 
 def save_state(state):
     with open(STATE_PATH, "w") as f:
         json.dump(state, f, indent=2)
+
+def fetch_live_balance(client):
+    try:
+        bal = client.futures_account_balance()
+        usdt = next((float(x['balance']) for x in bal if x['asset'] == 'USDT'), 0.0)
+        return usdt
+    except Exception as e:
+        log.error(f"❌ Could not fetch balance: {e}")
+        return 1000.0
 
 # ── Data fetch (futures klines — works from geo-blocked regions like Railway) ─
 def fetch_mtf(client, symbol="BTCUSDT", bars=200):
@@ -169,8 +190,7 @@ def main():
     log.info("🚀 Crypto Live Agent starting (FUTURES TESTNET)")
     log.info(f"   Symbol:    {SYMBOL}")
     log.info(f"   Notional:  ${TRADE_NOTIONAL} USDT")
-    log.info(f"   Leverage:  {LEVERAGE}× (no margin risk)")
-    log.info(f"   Hard SL:   {SL_PCT*100}%")
+    log.info(f"   Leverage:  {LEVERAGE}×")
     log.info(f"   Model:     {MODEL_PATH}")
 
     # Two clients: one for mainnet futures data, one for testnet execution
@@ -192,7 +212,19 @@ def main():
         log.error(f"❌ Connection failed: {e}")
         return
 
-    # Set leverage to 1×
+    # Live balance + per-trade loss cap (refreshed every 24h in loop)
+    live_balance = fetch_live_balance(client)
+    max_loss_per_trade = TRADE_NOTIONAL * 0.03  # 3% of notional — backstop wider than widest dynamic SL
+    daily_loss_limit = -(live_balance * 0.10)   # -10% of balance — kill switch
+    last_balance_refresh = datetime.now(timezone.utc)
+    log.info(f"💰 Balance: ${live_balance:,.2f} | Max loss/trade: ${max_loss_per_trade:.2f} | Kill switch: ${daily_loss_limit:.2f}")
+
+    # Margin sanity check
+    required_margin = TRADE_NOTIONAL / LEVERAGE
+    if live_balance < required_margin * 1.5:
+        log.warning(f"⚠️ Low balance warning: ${live_balance:.2f} may be insufficient for ${required_margin:.2f} margin per trade")
+
+    # Set leverage
     try:
         client.futures_change_leverage(symbol=SYMBOL, leverage=LEVERAGE)
         log.info(f"✅ Leverage set to {LEVERAGE}× for {SYMBOL}")
@@ -205,6 +237,13 @@ def main():
         return
     model = PPO.load(MODEL_PATH)
     log.info(f"✅ Model loaded: {MODEL_PATH}")
+
+    # Load reasoning memory
+    memory = TradeMemory(
+        memory_file=os.path.join(os.path.dirname(os.path.abspath(__file__)), "trade_memory.json"),
+        log_file=os.path.join(os.path.dirname(os.path.abspath(__file__)), "trade_log.csv")
+    )
+    log.info(f"✅ Memory loaded: {memory.memory['total_trades']} historical trades")
 
     # Symbol filters
     step_size, min_qty, qty_prec = get_futures_symbol_info(client, SYMBOL)
@@ -221,9 +260,18 @@ def main():
 
     while True:
         try:
+            # Refresh live balance every 24h
+            hours_since_refresh = (datetime.now(timezone.utc) - last_balance_refresh).total_seconds() / 3600
+            if hours_since_refresh >= 24:
+                live_balance = fetch_live_balance(client)
+                max_loss_per_trade = TRADE_NOTIONAL * 0.03
+                daily_loss_limit = -(live_balance * 0.10)
+                last_balance_refresh = datetime.now(timezone.utc)
+                log.info(f"💰 Balance refreshed: ${live_balance:,.2f} | Max loss/trade: ${max_loss_per_trade:.2f} | Kill switch: ${daily_loss_limit:.2f}")
+
             # Daily loss limit kill switch
-            if state['total_pnl_usdt'] < DAILY_LOSS_LIMIT:
-                log.error(f"🛑 Loss limit hit: ${state['total_pnl_usdt']:.2f} < ${DAILY_LOSS_LIMIT:.2f}. Shutting down.")
+            if state['total_pnl_usdt'] < daily_loss_limit:
+                log.error(f"🛑 Loss limit hit: ${state['total_pnl_usdt']:.2f} < ${daily_loss_limit:.2f}. Shutting down.")
                 return
 
             df = fetch_mtf(data_client, SYMBOL, bars=200)
@@ -255,10 +303,31 @@ def main():
                         state['wins'] += 1
                     else:
                         state['losses'] += 1
+                    # Record resynced exit to memory if we have entry context
+                    if state.get('entry_conditions'):
+                        try:
+                            memory.record_trade(
+                                conditions=state['entry_conditions'],
+                                action="BUY" if state['position'] == 1 else "SELL",
+                                entry_price=state['entry_price'],
+                                exit_price=current_price,
+                                pnl_pct=pnl_pct,
+                                pnl_usdt=pnl_usdt,
+                                confidence=state.get('entry_confidence', 0.5),
+                                verdict=state.get('entry_verdict', 'UNKNOWN'),
+                                reasoning=state.get('entry_reasoning', '') + " [resynced]",
+                                trade_type="live"
+                            )
+                        except Exception as e:
+                            log.error(f"❌ Memory record failed: {e}")
                     state['position'] = 0
                     state['entry_price'] = 0.0
                     state['entry_time'] = None
                     state['qty'] = 0.0
+                    state['entry_conditions'] = None
+                    state['entry_confidence'] = 0.5
+                    state['entry_verdict'] = None
+                    state['entry_reasoning'] = ""
                     save_state(state)
                 elif exchange_qty != 0 and state['position'] == 0:
                     log.warning(f"⚠️  Exchange has qty={exchange_qty} but state=flat — manual resolution needed")
@@ -299,6 +368,19 @@ def main():
             action_names = {0: "HOLD", 1: "BUY (long)", 2: "SELL (short)", 3: "CLOSE"}
             log.info(f"🤖 Decision: {action_names[action]} | Position: {state['position']}")
 
+            # ── Reasoning engine gate ─────────────────────────────────────────
+            perception = perceive(df, state)
+            conditions, narrative = interpret(perception)
+            verdict, confidence, reasoning_text = decide(action, conditions, perception, memory, narrative)
+            log.info(f"\n{'='*55}\n{reasoning_text}\n{'='*55}")
+
+            if action in (1, 2) and verdict not in ("EXECUTE", "WEAK_EXECUTE"):
+                log.info(f"⛔ Trade REJECTED by reasoning engine")
+                wr = state['wins'] / max(1, state['wins'] + state['losses'])
+                log.info(f"📋 Trades: {state['trade_count']} | WR: {wr:.1%} | PnL: ${state['total_pnl_usdt']:+.2f}")
+                time.sleep(FETCH_EVERY)
+                continue
+
             # ── Daily trade limit gate (entries only — closes always allowed) ─
             today = datetime.now(timezone.utc).date().isoformat()
             if state.get('last_trade_date') != today:
@@ -310,6 +392,10 @@ def main():
 
             # ── Execute ────────────────────────────────────────────────
             if state['position'] == 0 and entries_allowed:
+                if action in (1, 2):
+                    sl_pct, tp_pct = get_dynamic_sl_tp(conditions, memory)
+                    log.info(f"📐 Dynamic SL: {sl_pct:.1%} | TP: {tp_pct:.1%} | WR basis: {memory.get_win_rate(conditions)}")
+
                 if action == 1:  # open LONG
                     order, qty = open_long(client, SYMBOL, TRADE_NOTIONAL, current_price,
                                            step_size, min_qty, qty_prec)
@@ -320,11 +406,17 @@ def main():
                         state['qty'] = qty
                         state['trade_count'] += 1
                         state['daily_trades'] += 1
+                        state['sl_pct'] = sl_pct
+                        state['tp_pct'] = tp_pct
+                        state['entry_conditions'] = conditions
+                        state['entry_confidence'] = confidence
+                        state['entry_verdict'] = verdict
+                        state['entry_reasoning'] = reasoning_text[:300]
                         save_state(state)  # save IMMEDIATELY after fill
                         log.info(f"📈 LONG opened | qty={qty} @ ${current_price:,.0f}")
                         # Place exchange stop-market — instant SL, no polling required
                         try:
-                            sl_price = round(current_price * (1 - SL_PCT), 1)
+                            sl_price = round(current_price * (1 - sl_pct), 1)
                             client.futures_create_order(
                                 symbol=SYMBOL,
                                 side="SELL",
@@ -346,11 +438,17 @@ def main():
                         state['qty'] = qty
                         state['trade_count'] += 1
                         state['daily_trades'] += 1
+                        state['sl_pct'] = sl_pct
+                        state['tp_pct'] = tp_pct
+                        state['entry_conditions'] = conditions
+                        state['entry_confidence'] = confidence
+                        state['entry_verdict'] = verdict
+                        state['entry_reasoning'] = reasoning_text[:300]
                         save_state(state)
                         log.info(f"📉 SHORT opened | qty={qty} @ ${current_price:,.0f}")
                         # Place exchange stop-market — instant SL, no polling required
                         try:
-                            sl_price = round(current_price * (1 + SL_PCT), 1)
+                            sl_price = round(current_price * (1 + sl_pct), 1)
                             client.futures_create_order(
                                 symbol=SYMBOL,
                                 side="BUY",
@@ -362,15 +460,39 @@ def main():
                         except Exception as e:
                             log.error(f"❌ SL placement failed: {e}")
 
-            else:  # in a position
-                # Hard SL check
+            elif state['position'] != 0:  # in a position
+                sl_pct = state.get('sl_pct', 0.02)
+                tp_pct = state.get('tp_pct', 0.04)
                 force_close = False
-                if state['position'] == 1 and current_price <= state['entry_price'] * (1 - SL_PCT):
-                    log.info(f"🛑 LONG SL triggered @ ${current_price:,.0f}")
-                    force_close = True
-                elif state['position'] == -1 and current_price >= state['entry_price'] * (1 + SL_PCT):
-                    log.info(f"🛑 SHORT SL triggered @ ${current_price:,.0f}")
-                    force_close = True
+                close_reason = None
+
+                if state['position'] == 1:
+                    if current_price <= state['entry_price'] * (1 - sl_pct):
+                        log.info(f"🛑 LONG SL @ ${current_price:,.0f}")
+                        force_close = True
+                        close_reason = "SL"
+                    elif current_price >= state['entry_price'] * (1 + tp_pct):
+                        log.info(f"🎯 LONG TP @ ${current_price:,.0f}")
+                        force_close = True
+                        close_reason = "TP"
+                elif state['position'] == -1:
+                    if current_price >= state['entry_price'] * (1 + sl_pct):
+                        log.info(f"🛑 SHORT SL @ ${current_price:,.0f}")
+                        force_close = True
+                        close_reason = "SL"
+                    elif current_price <= state['entry_price'] * (1 - tp_pct):
+                        log.info(f"🎯 SHORT TP @ ${current_price:,.0f}")
+                        force_close = True
+                        close_reason = "TP"
+
+                # Account protection: cap loss per trade
+                if not force_close:
+                    upnl_pct = (current_price - state['entry_price']) / state['entry_price'] * state['position']
+                    upnl_usdt = upnl_pct * TRADE_NOTIONAL
+                    if upnl_usdt < 0 and abs(upnl_usdt) >= max_loss_per_trade:
+                        log.warning(f"🛡️ Account protection: loss ${abs(upnl_usdt):.2f} >= limit ${max_loss_per_trade:.2f}")
+                        force_close = True
+                        close_reason = "ACCOUNT_PROTECTION"
 
                 if action == 3 or force_close:
                     pos = state['position']
@@ -393,10 +515,33 @@ def main():
                         log.info(f"💰 {side_name} closed @ ${current_price:,.0f} | "
                                  f"PnL: ${pnl_usdt:+.2f} ({pnl_pct*100:+.2f}%) | "
                                  f"WR: {wr:.1%} | Total: ${state['total_pnl_usdt']:+.2f}")
+
+                        # Record outcome to memory
+                        if state.get('entry_conditions'):
+                            try:
+                                memory.record_trade(
+                                    conditions=state['entry_conditions'],
+                                    action="BUY" if pos == 1 else "SELL",
+                                    entry_price=state['entry_price'],
+                                    exit_price=current_price,
+                                    pnl_pct=pnl_pct,
+                                    pnl_usdt=pnl_usdt,
+                                    confidence=state.get('entry_confidence', 0.5),
+                                    verdict=state.get('entry_verdict', 'UNKNOWN'),
+                                    reasoning=state.get('entry_reasoning', ''),
+                                    trade_type="live"
+                                )
+                            except Exception as e:
+                                log.error(f"❌ Memory record failed: {e}")
+
                         state['position'] = 0
                         state['entry_price'] = 0.0
                         state['entry_time'] = None
                         state['qty'] = 0.0
+                        state['entry_conditions'] = None
+                        state['entry_confidence'] = 0.5
+                        state['entry_verdict'] = None
+                        state['entry_reasoning'] = ""
                         save_state(state)
 
             # Periodic status

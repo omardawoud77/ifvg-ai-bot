@@ -1,0 +1,6 @@
+*.pkl
+*.log
+historical_trade_log.csv
+trade_log.csv
+*.backup
+__pycache__/
