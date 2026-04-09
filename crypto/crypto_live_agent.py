@@ -93,6 +93,7 @@ DEFAULT_STATE = {
     "last_rejected_bar_ts": None,
     "last_rejected_sl_pct": 0.02,
     "last_rejected_tp_pct": 0.04,
+    "breakeven_set": False,
 }
 
 def load_state(state_path):
@@ -482,37 +483,80 @@ def process_symbol(symbol, ctx):
         elif state['position'] != 0:  # in a position
             sl_pct = state.get('sl_pct', 0.02)
             tp_pct = state.get('tp_pct', 0.04)
+            entry = state['entry_price']
             force_close = False
             close_reason = None
 
+            # Unrealized PnL (used for account protection + voluntary close gate)
+            upnl_pct = (current_price - entry) / entry * state['position']
+
+            # SL / TP checks
             if state['position'] == 1:
-                if current_price <= state['entry_price'] * (1 - sl_pct):
+                if current_price <= entry * (1 - sl_pct):
                     log.info(f"{tag} 🛑 LONG SL @ ${current_price:,.2f}")
                     force_close = True
                     close_reason = "SL"
-                elif current_price >= state['entry_price'] * (1 + tp_pct):
+                elif current_price >= entry * (1 + tp_pct):
                     log.info(f"{tag} 🎯 LONG TP @ ${current_price:,.2f}")
                     force_close = True
                     close_reason = "TP"
             elif state['position'] == -1:
-                if current_price >= state['entry_price'] * (1 + sl_pct):
+                if current_price >= entry * (1 + sl_pct):
                     log.info(f"{tag} 🛑 SHORT SL @ ${current_price:,.2f}")
                     force_close = True
                     close_reason = "SL"
-                elif current_price <= state['entry_price'] * (1 - tp_pct):
+                elif current_price <= entry * (1 - tp_pct):
                     log.info(f"{tag} 🎯 SHORT TP @ ${current_price:,.2f}")
                     force_close = True
                     close_reason = "TP"
 
+            # Account protection
             if not force_close:
-                upnl_pct = (current_price - state['entry_price']) / state['entry_price'] * state['position']
                 upnl_usdt = upnl_pct * TRADE_NOTIONAL
                 if upnl_usdt < 0 and abs(upnl_usdt) >= max_loss_per_trade:
                     log.warning(f"{tag} 🛡️ Account protection: loss ${abs(upnl_usdt):.2f} >= limit ${max_loss_per_trade:.2f}")
                     force_close = True
                     close_reason = "ACCOUNT_PROTECTION"
 
-            if action == 3 or force_close:
+            # ── Breakeven: move SL to entry when price reaches 50% of TP distance ──
+            if not force_close and not state.get('breakeven_set', False):
+                be_triggered = False
+                if state['position'] == 1 and current_price >= entry * (1 + tp_pct * 0.5):
+                    be_triggered = True
+                    be_side = "SELL"
+                elif state['position'] == -1 and current_price <= entry * (1 - tp_pct * 0.5):
+                    be_triggered = True
+                    be_side = "BUY"
+
+                if be_triggered:
+                    state['sl_pct'] = 0.0
+                    sl_pct = 0.0   # update local var so SL check uses breakeven if re-evaluated
+                    state['breakeven_set'] = True
+                    save_state(state, state_path)
+                    log.info(f"{tag} 🔒 Breakeven set — SL moved to entry @ ${entry:,.2f}")
+                    try:
+                        exec_client.futures_cancel_all_open_orders(symbol=symbol)
+                        be_price = round_price(entry, tick_size, price_prec)
+                        exec_client.futures_create_order(
+                            symbol=symbol,
+                            side=be_side,
+                            type="STOP_MARKET",
+                            stopPrice=be_price,
+                            closePosition="true",
+                        )
+                        log.info(f"{tag} 🛡️  Exchange SL replaced @ ${be_price} (breakeven)")
+                    except Exception as e:
+                        log.error(f"{tag} ❌ Breakeven SL placement failed: {e}")
+
+            # ── Voluntary close gate: action == 3 only allowed when in loss ──
+            allow_voluntary_close = False
+            if action == 3 and not force_close:
+                if upnl_pct < 0:
+                    allow_voluntary_close = True
+                else:
+                    log.info(f"{tag} 🔒 Voluntary close blocked — in profit {upnl_pct*100:+.2f}%, let TP/BE handle exit")
+
+            if force_close or allow_voluntary_close:
                 pos = state['position']
                 qty = state['qty']
                 if pos == 1:
@@ -521,7 +565,7 @@ def process_symbol(symbol, ctx):
                     order = close_short(exec_client, symbol, qty)
 
                 if order:
-                    pnl_pct = (current_price - state['entry_price']) / state['entry_price'] * pos
+                    pnl_pct = (current_price - entry) / entry * pos
                     pnl_usdt = pnl_pct * TRADE_NOTIONAL
                     state['total_pnl_usdt'] += pnl_usdt
                     if pnl_pct > 0:
@@ -539,7 +583,7 @@ def process_symbol(symbol, ctx):
                             memory.record_trade(
                                 conditions=state['entry_conditions'],
                                 action="BUY" if pos == 1 else "SELL",
-                                entry_price=state['entry_price'],
+                                entry_price=entry,
                                 exit_price=current_price,
                                 pnl_pct=pnl_pct,
                                 pnl_usdt=pnl_usdt,
@@ -559,6 +603,7 @@ def process_symbol(symbol, ctx):
                     state['entry_confidence'] = 0.5
                     state['entry_verdict'] = None
                     state['entry_reasoning'] = ""
+                    state['breakeven_set'] = False
                     save_state(state, state_path)
 
         wr = state['wins'] / max(1, state['wins'] + state['losses'])
