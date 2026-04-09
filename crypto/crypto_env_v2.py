@@ -238,6 +238,11 @@ class CryptoMTFEnv(gym.Env):
                 dd = (self.peak_capital - self.capital) / (self.peak_capital + 1e-8)
                 self.max_drawdown = max(self.max_drawdown, dd)
 
+                # Expose trade-close details for reward-override subclasses
+                info['trade_closed'] = True
+                info['pnl_pct'] = pnl_pct
+                info['close_reason'] = close_reason
+
                 self.position = 0
                 self.entry_price = 0.0
                 self.unrealized_pnl = 0.0
@@ -269,6 +274,37 @@ class CryptoMTFEnv(gym.Env):
               f"Capital: ${self.capital:.2f} | "
               f"PnL: ${self.capital - self.initial_capital:+.2f} | "
               f"WR: {wr:.1%} ({self.wins}W/{self.losses}L)")
+
+
+class CryptoRREnv(CryptoMTFEnv):
+    """
+    Subclass with RR-aware reward. Forces agent to find 1.5%+ moves.
+    Small wins are penalized to prevent scalping behavior.
+
+    Reward on trade close:
+      pnl >= 1.5%:  +3.0  (meaningful win)
+      0 <= pnl < 1.5%: -0.5  (small win penalized — we want real moves)
+      pnl < 0:      -2.0  (loss)
+
+    Non-close bars keep the parent's continuous reward (hold cost +
+    unrealized PnL delta) for gradient signal during the hold period.
+    """
+    MIN_PROFIT_PCT = 0.015  # 1.5% minimum gain to reward positively
+
+    def step(self, action):
+        obs, reward, done, truncated, info = super().step(action)
+
+        # Override reward only when a trade closes
+        if info.get('trade_closed', False):
+            pnl_pct = info.get('pnl_pct', 0)
+            if pnl_pct >= self.MIN_PROFIT_PCT:
+                reward = 3.0    # meaningful win
+            elif pnl_pct >= 0:
+                reward = -0.5   # small win penalized
+            else:
+                reward = -2.0   # loss
+
+        return obs, reward, done, truncated, info
 
 
 if __name__ == "__main__":
