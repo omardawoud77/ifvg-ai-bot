@@ -69,6 +69,32 @@ def perceive(df, state):
     if position != 0 and entry_price > 0:
         upnl = (close - entry_price) / entry_price * position
 
+    # Wick analysis (latest completed bar)
+    bar_open = float(latest.get('open', close))
+    bar_high = float(latest.get('high', close))
+    bar_low = float(latest.get('low', close))
+    bar_range = bar_high - bar_low + 1e-9
+    upper_wick = (bar_high - max(bar_open, close)) / bar_range
+    lower_wick = (min(bar_open, close) - bar_low) / bar_range
+    body_pct = abs(close - bar_open) / bar_range
+
+    # Candle patterns (latest vs previous completed bar)
+    prev_open = float(prev.get('open', float(prev['close'])))
+    prev_close = float(prev['close'])
+    is_bearish_engulfing = (close < bar_open and
+                            bar_open > prev_close and close < prev_open)
+    is_bullish_engulfing = (close > bar_open and
+                            bar_open < prev_close and close > prev_open)
+    is_doji = body_pct < 0.1
+
+    # FVG detection (3-bar pattern: bar 3 ago vs latest)
+    bullish_fvg = False
+    bearish_fvg = False
+    if len(df) >= 5:
+        bar_3ago = df.iloc[-4]
+        bullish_fvg = float(bar_3ago.get('high', bar_3ago['close'])) < bar_low
+        bearish_fvg = float(bar_3ago.get('low', bar_3ago['close'])) > bar_high
+
     perception = {
         "price": close,
         "price_vs_4h": (close - h4_close) / max(h4_close, 0.01),
@@ -84,6 +110,15 @@ def perceive(df, state):
         "position": position,
         "upnl": upnl,
         "bars_held": bars_held,
+        # ICT features
+        "upper_wick_pct": upper_wick,
+        "lower_wick_pct": lower_wick,
+        "body_pct": body_pct,
+        "is_bearish_engulfing": is_bearish_engulfing,
+        "is_bullish_engulfing": is_bullish_engulfing,
+        "is_doji": is_doji,
+        "bullish_fvg": bullish_fvg,
+        "bearish_fvg": bearish_fvg,
     }
 
     return perception
@@ -171,6 +206,39 @@ def interpret(perception):
         conditions['session'] = 'OFF_HOURS'
         narrative.append("Asia session")
 
+    # Wick rejection
+    if perception['upper_wick_pct'] > 0.6:
+        conditions['wick'] = 'UPPER_REJECTION'
+        narrative.append("Strong upper wick — bearish rejection")
+    elif perception['lower_wick_pct'] > 0.6:
+        conditions['wick'] = 'LOWER_REJECTION'
+        narrative.append("Strong lower wick — bullish rejection")
+    else:
+        conditions['wick'] = 'NEUTRAL'
+
+    # Candle pattern
+    if perception['is_doji']:
+        conditions['candle'] = 'DOJI'
+        narrative.append("Doji — market indecision")
+    elif perception['is_bearish_engulfing']:
+        conditions['candle'] = 'BEARISH_ENGULF'
+        narrative.append("Bearish engulfing — strong reversal signal")
+    elif perception['is_bullish_engulfing']:
+        conditions['candle'] = 'BULLISH_ENGULF'
+        narrative.append("Bullish engulfing — strong reversal signal")
+    else:
+        conditions['candle'] = 'NORMAL'
+
+    # FVG
+    if perception['bullish_fvg']:
+        conditions['fvg'] = 'BULLISH_FVG'
+        narrative.append("Bullish FVG present — price may fill gap")
+    elif perception['bearish_fvg']:
+        conditions['fvg'] = 'BEARISH_FVG'
+        narrative.append("Bearish FVG present — price may fill gap")
+    else:
+        conditions['fvg'] = 'NONE'
+
     return conditions, narrative
 
 
@@ -245,6 +313,50 @@ def reason(ppo_action, conditions, perception, memory):
         if conditions['volatility'] == 'HIGH':
             evidence_against.append("High volatility — stop risk elevated")
             confidence -= 0.08
+
+        # ICT: Wick confluence
+        if action_is_long:
+            if conditions.get('wick') == 'LOWER_REJECTION':
+                evidence_for.append("Lower wick rejection confirms bullish entry")
+                confidence += 0.08
+            elif conditions.get('wick') == 'UPPER_REJECTION':
+                evidence_against.append("Upper wick rejection contradicts long entry")
+                confidence -= 0.08
+        elif action_is_short:
+            if conditions.get('wick') == 'UPPER_REJECTION':
+                evidence_for.append("Upper wick rejection confirms short entry")
+                confidence += 0.08
+            elif conditions.get('wick') == 'LOWER_REJECTION':
+                evidence_against.append("Lower wick rejection contradicts short entry")
+                confidence -= 0.08
+
+        # ICT: Candle pattern confluence
+        candle = conditions.get('candle', 'NORMAL')
+        if action_is_long and candle == 'BULLISH_ENGULF':
+            evidence_for.append("Bullish engulfing confirms long")
+            confidence += 0.10
+        elif action_is_long and candle == 'BEARISH_ENGULF':
+            evidence_against.append("Bearish engulfing contradicts long")
+            confidence -= 0.10
+        elif action_is_short and candle == 'BEARISH_ENGULF':
+            evidence_for.append("Bearish engulfing confirms short")
+            confidence += 0.10
+        elif action_is_short and candle == 'BULLISH_ENGULF':
+            evidence_against.append("Bullish engulfing contradicts short")
+            confidence -= 0.10
+
+        if candle == 'DOJI':
+            evidence_against.append("Doji — avoid entry during indecision")
+            confidence -= 0.12
+
+        # ICT: FVG confluence
+        fvg = conditions.get('fvg', 'NONE')
+        if action_is_long and fvg == 'BULLISH_FVG':
+            evidence_for.append("Bullish FVG supports long bias")
+            confidence += 0.06
+        elif action_is_short and fvg == 'BEARISH_FVG':
+            evidence_for.append("Bearish FVG supports short bias")
+            confidence += 0.06
 
         # Memory check
         veto, wr = memory.should_veto(conditions)
