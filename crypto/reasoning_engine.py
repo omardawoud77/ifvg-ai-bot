@@ -470,15 +470,15 @@ def simulate_missed_trade(df, rejection_bar_idx, rejected_action, sl_pct, tp_pct
 def get_dynamic_sl_tp(conditions, memory):
     wr = memory.get_win_rate(conditions)
     if wr is None:
-        return 0.02, 0.04
+        return 0.015, 0.04
     if wr >= 0.70:
         return 0.015, 0.045
     elif wr >= 0.60:
-        return 0.02, 0.04
+        return 0.015, 0.04
     elif wr >= 0.55:
         return 0.025, 0.035
     else:
-        return 0.02, 0.04
+        return 0.015, 0.04
 
 
 # ── LAYER 4: DECISION + EXPLANATION ──────────────────────────────────────────

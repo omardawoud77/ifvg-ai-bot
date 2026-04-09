@@ -82,7 +82,7 @@ DEFAULT_STATE = {
     "total_pnl_usdt": 0.0,
     "daily_trades": 0,
     "last_trade_date": None,
-    "sl_pct": 0.02,
+    "sl_pct": 0.015,
     "tp_pct": 0.04,
     "entry_conditions": None,
     "entry_confidence": 0.5,
@@ -91,7 +91,7 @@ DEFAULT_STATE = {
     "last_rejected_action": None,
     "last_rejected_conditions": None,
     "last_rejected_bar_ts": None,
-    "last_rejected_sl_pct": 0.02,
+    "last_rejected_sl_pct": 0.015,
     "last_rejected_tp_pct": 0.04,
     "breakeven_set": False,
     "trail_1r_set": False,
@@ -281,7 +281,7 @@ def process_symbol(symbol, ctx):
                 rejected_ts = state.get('last_rejected_bar_ts')
                 rejected_action = state['last_rejected_action']
                 rejected_conditions = state['last_rejected_conditions']
-                r_sl = state.get('last_rejected_sl_pct', 0.02)
+                r_sl = state.get('last_rejected_sl_pct', 0.015)
                 r_tp = state.get('last_rejected_tp_pct', 0.04)
 
                 rejected_idx = None
@@ -439,14 +439,14 @@ def process_symbol(symbol, ctx):
                     log.info(f"{tag} 📈 LONG opened | qty={qty} @ ${current_price:,.2f}")
                     try:
                         sl_price = round_price(current_price * (1 - sl_pct), tick_size, price_prec)
-                        exec_client.futures_create_order(
+                        sl_order = exec_client.futures_create_order(
                             symbol=symbol,
                             side="SELL",
                             type="STOP_MARKET",
                             stopPrice=sl_price,
                             closePosition="true",
                         )
-                        log.info(f"{tag} 🛡️  Exchange SL placed @ ${sl_price}")
+                        log.info(f"{tag} ✅ Exchange SL confirmed — orderId: {sl_order['orderId']} @ ${sl_price}")
                     except Exception as e:
                         log.error(f"{tag} ❌ SL placement failed: {e}")
 
@@ -470,19 +470,19 @@ def process_symbol(symbol, ctx):
                     log.info(f"{tag} 📉 SHORT opened | qty={qty} @ ${current_price:,.2f}")
                     try:
                         sl_price = round_price(current_price * (1 + sl_pct), tick_size, price_prec)
-                        exec_client.futures_create_order(
+                        sl_order = exec_client.futures_create_order(
                             symbol=symbol,
                             side="BUY",
                             type="STOP_MARKET",
                             stopPrice=sl_price,
                             closePosition="true",
                         )
-                        log.info(f"{tag} 🛡️  Exchange SL placed @ ${sl_price}")
+                        log.info(f"{tag} ✅ Exchange SL confirmed — orderId: {sl_order['orderId']} @ ${sl_price}")
                     except Exception as e:
                         log.error(f"{tag} ❌ SL placement failed: {e}")
 
         elif state['position'] != 0:  # in a position
-            sl_pct = state.get('sl_pct', 0.02)
+            sl_pct = state.get('sl_pct', 0.015)
             tp_pct = state.get('tp_pct', 0.04)
             entry = state['entry_price']
             force_close = False
@@ -538,14 +538,14 @@ def process_symbol(symbol, ctx):
                     try:
                         exec_client.futures_cancel_all_open_orders(symbol=symbol)
                         be_price = round_price(entry, tick_size, price_prec)
-                        exec_client.futures_create_order(
+                        sl_order = exec_client.futures_create_order(
                             symbol=symbol,
                             side=be_side,
                             type="STOP_MARKET",
                             stopPrice=be_price,
                             closePosition="true",
                         )
-                        log.info(f"{tag} 🛡️  Exchange SL replaced @ ${be_price} (breakeven)")
+                        log.info(f"{tag} ✅ Exchange SL confirmed — orderId: {sl_order['orderId']} @ ${be_price} (breakeven)")
                     except Exception as e:
                         log.error(f"{tag} ❌ Breakeven SL placement failed: {e}")
 
@@ -573,14 +573,14 @@ def process_symbol(symbol, ctx):
                     log.info(f"{tag} 📈 Trail 1R set — SL moved to 50% TP @ ${trail_sl_price}")
                     try:
                         exec_client.futures_cancel_all_open_orders(symbol=symbol)
-                        exec_client.futures_create_order(
+                        sl_order = exec_client.futures_create_order(
                             symbol=symbol,
                             side=trail_side,
                             type="STOP_MARKET",
                             stopPrice=trail_sl_price,
                             closePosition="true",
                         )
-                        log.info(f"{tag} 🛡️  Exchange SL replaced @ ${trail_sl_price} (1R lock)")
+                        log.info(f"{tag} ✅ Exchange SL confirmed — orderId: {sl_order['orderId']} @ ${trail_sl_price} (1R lock)")
                     except Exception as e:
                         log.error(f"{tag} ❌ Trail SL placement failed: {e}")
 
