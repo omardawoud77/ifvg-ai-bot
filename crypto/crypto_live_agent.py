@@ -94,6 +94,7 @@ DEFAULT_STATE = {
     "last_rejected_sl_pct": 0.02,
     "last_rejected_tp_pct": 0.04,
     "breakeven_set": False,
+    "trail_1r_set": False,
 }
 
 def load_state(state_path):
@@ -548,13 +549,54 @@ def process_symbol(symbol, ctx):
                     except Exception as e:
                         log.error(f"{tag} ❌ Breakeven SL placement failed: {e}")
 
-            # ── Voluntary close gate: action == 3 only allowed when in loss ──
+            # ── Trail 1R: at 75% TP, move SL to 50% TP (locks in ~1R profit) ──
+            if not force_close and state.get('breakeven_set', False) and not state.get('trail_1r_set', False):
+                trail_triggered = False
+                trail_sl_price = None
+                if state['position'] == 1 and current_price >= entry * (1 + tp_pct * 0.75):
+                    trail_triggered = True
+                    trail_sl_price = round_price(entry * (1 + tp_pct * 0.5), tick_size, price_prec)
+                    trail_side = "SELL"
+                    # Update sl_pct so software SL check uses the new level
+                    state['sl_pct'] = tp_pct * 0.5
+                    sl_pct = state['sl_pct']
+                elif state['position'] == -1 and current_price <= entry * (1 - tp_pct * 0.75):
+                    trail_triggered = True
+                    trail_sl_price = round_price(entry * (1 - tp_pct * 0.5), tick_size, price_prec)
+                    trail_side = "BUY"
+                    state['sl_pct'] = tp_pct * 0.5
+                    sl_pct = state['sl_pct']
+
+                if trail_triggered:
+                    state['trail_1r_set'] = True
+                    save_state(state, state_path)
+                    log.info(f"{tag} 📈 Trail 1R set — SL moved to 50% TP @ ${trail_sl_price}")
+                    try:
+                        exec_client.futures_cancel_all_open_orders(symbol=symbol)
+                        exec_client.futures_create_order(
+                            symbol=symbol,
+                            side=trail_side,
+                            type="STOP_MARKET",
+                            stopPrice=trail_sl_price,
+                            closePosition="true",
+                        )
+                        log.info(f"{tag} 🛡️  Exchange SL replaced @ ${trail_sl_price} (1R lock)")
+                    except Exception as e:
+                        log.error(f"{tag} ❌ Trail SL placement failed: {e}")
+
+            # ── Voluntary close gate ──
+            # Blocked if profit < 50% TP (let breakeven/trail handle it).
+            # Allowed if in loss (cut losses) OR past 50% TP (profit already secured).
             allow_voluntary_close = False
             if action == 3 and not force_close:
+                half_tp = tp_pct * 0.5
                 if upnl_pct < 0:
                     allow_voluntary_close = True
+                elif upnl_pct >= half_tp:
+                    allow_voluntary_close = True
+                    log.info(f"{tag} 💰 Voluntary close allowed — profit {upnl_pct*100:+.2f}% past 50% TP")
                 else:
-                    log.info(f"{tag} 🔒 Voluntary close blocked — in profit {upnl_pct*100:+.2f}%, let TP/BE handle exit")
+                    log.info(f"{tag} 🔒 Voluntary close blocked — profit {upnl_pct*100:+.2f}% < 50% TP, let trail handle exit")
 
             if force_close or allow_voluntary_close:
                 pos = state['position']
@@ -604,6 +646,7 @@ def process_symbol(symbol, ctx):
                     state['entry_verdict'] = None
                     state['entry_reasoning'] = ""
                     state['breakeven_set'] = False
+                    state['trail_1r_set'] = False
                     save_state(state, state_path)
 
         wr = state['wins'] / max(1, state['wins'] + state['losses'])
