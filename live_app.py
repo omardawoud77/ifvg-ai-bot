@@ -1,2048 +1,579 @@
 """
-live_app.py — IFVG Live AI v7
-Full MTF ICT Framework + Auto Paper Trading + AI Learning
-
-ICT Layer (NEW in v7):
-  - Full multi-timeframe analysis: Weekly → Daily → 4H → 1H → 15m → 5m
-  - FVG detection on all timeframes
-  - Order block identification (Daily, 4H, 1H)
-  - Liquidity sweep detection (equal highs/lows)
-  - Market structure (BOS/CHoCH) tracking
-  - Trade type: Continuation vs Reversal with separate scoring weights
-  - Absorption candle detection on 5m
-  - Kill zone precision (London open, NY open, NY PM)
-  - ICT score layer added on top of XGBoost base score
+live_app.py — ICT Strict Filter Bot v2
+Based on backtest_v2.py — all 5 filters must pass simultaneously
+Filters: Volume 1.5x, HTF alignment (W=D=4H), 1H momentum, RSI 35-65, FVG or OB
+Trade persistence: writes to trades_log.json on every close (survives restarts)
 """
 
-from flask import Flask, jsonify, render_template_string, request as freq
-import joblib, numpy as np, pandas as pd
-from datetime import datetime, timezone, timedelta
+from flask import Flask, jsonify, render_template_string
+import numpy as np
+import pandas as pd
+import requests as req
+from datetime import datetime, timezone
+import json, os, time, threading, logging
 
-def now_et():
-    """Return current time in ET (UTC-4 in summer / EDT)."""
-    return datetime.now(timezone.utc) + timedelta(hours=-4)
-
-def et_str(fmt="%H:%M:%S"):
-    return now_et().strftime(fmt)
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import LabelEncoder
-import sys, json, os, time, threading, requests as req
-import yfinance as yf
+logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
+log = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# ── Model ─────────────────────────────────────────────────────────────────────
-try:
-    art   = joblib.load("model.pkl")
-    model = art["model"]
-    les   = art["label_encoders"]
-    FCOLS = art["feature_cols"]
-    print("✅ Model loaded")
-except Exception as e:
-    sys.exit(f"model.pkl not found — run train_real.py first ({e})")
-
-TRADE_LOG       = "live_trades.json"
-RR              = 2.0
-MNQ_PTS_TO_USD  = 2.0
-SCORE_THRESHOLD = 78
-
-last_fetch   = 0
-INTERVAL     = 15
-last_htf_fetch = 0
-HTF_INTERVAL = 900  # 15 min for HTF  # fetch weekly/daily/4H every 10 minutes only
-cached_htf = {}
-retrain_lock = threading.Lock()
+# ── Config ────────────────────────────────────────────────────────────────────
+RR         = 1.0
+VOL_MULT   = 1.5
+MAX_DAILY  = 5
+COOLDOWN   = 6       # bars (5m each = 30 min)
+INTERVAL   = 15      # seconds between fetches
+TRADE_LOG  = "trades_log.json"
+CAPITAL    = 10000.0
+PNL_PER_PT = 2.0     # MNQ: $2/point
 
 # ── State ─────────────────────────────────────────────────────────────────────
 state = {
-    "score": 0, "prob": 0.0, "take": False, "direction": "—",
-    "score_long": 0, "score_short": 0,
-    "base_score": 0, "ict_score": 0,
-    "rsi": 50.0, "ema_diff": 0.0, "vol_ratio": 1.0,
-    "session": "—", "htf_bias": "—", "sl_dist": 0.0,
-    "price": 0.0, "sl_price": 0.0, "tp_price": 0.0,
-    "last_update": "—", "error": None, "factors": [],
-    "ict_factors": [],
-    "trade_type": "—",
-    "alert": False, "alert_msg": "",
-    "trading_paused": False, "pause_until": None,
-    "total_trades": 0, "wins": 0, "losses": 0, "win_rate": 0,
-    "total_pnl_usd": 0.0,
-    "active_trade": None,
-    "trades": [], "stats": {},
-    "model_version": 0, "last_retrain": "—",
-    "data_source": "Yahoo Finance",
-    "mtf": {},
+    "price": 0.0, "direction": "—", "session": "—",
+    "rsi": 50.0, "vol_ratio": 0.0, "htf": "—",
+    "sl_price": 0.0, "tp_price": 0.0,
+    "filters": {},
+    "take": False, "active_trade": None,
+    "total_trades": 0, "wins": 0, "losses": 0, "win_rate": 0.0,
+    "capital": CAPITAL, "pnl": 0.0,
+    "last_update": "—", "error": None,
+    "trading_paused": False,
 }
 
-prev_score = 0
+bars_buffer = []
+last_bar_time = None
+last_trade_bar = -999
+daily_counts = {}
+_lock = threading.Lock()
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-def push_data_to_github():
-    """Push trade log and model to GitHub so they survive redeployments."""
-    try:
-        import subprocess
-        subprocess.run(["git", "config", "user.email", "omardawoud2009@hotmail.com"], capture_output=True)
-        subprocess.run(["git", "config", "user.name", "Omar"], capture_output=True)
-        # Set token in remote URL first
-        token = os.environ.get("GIT_TOKEN", "")
-        if token:
-            subprocess.run(["git", "remote", "set-url", "origin",
-                f"https://{token}@github.com/omardawoud77/ifvg-ai-bot.git"],
-                capture_output=True)
-        subprocess.run(["git", "add", "live_trades.json", "lessons.json", "human_knowledge.json"], capture_output=True)
-        result = subprocess.run(
-            ["git", "commit", "-m", "auto: save trades + model"],
-            capture_output=True, text=True
-        )
-        if "nothing to commit" in result.stdout:
-            return
-        subprocess.run(["git", "push"], capture_output=True)
-        print("✅ Trades + model pushed to GitHub")
-    except Exception as e:
-        print(f"⚠️  GitHub push failed: {e}")
-
-
-def load_lessons_summary():
-    """Load recent lessons for AI context."""
-    try:
-        import json
-        with open("lessons.json") as f:
-            data = json.load(f)
-        lessons = data.get("lessons", [])[-10:]  # last 10 lessons
-        if not lessons:
-            return "No lessons yet — first trades being analyzed."
-        summary = []
-        for l in lessons:
-            summary.append(f"- [{l.get('trade_result','?').upper()}] {l.get('lesson','')}")
-        return "\n".join(summary)
-    except:
-        return "No lessons available."
-
-def ai_trade_filter(direction, price, score, long_score, short_score, 
-                    weekly, daily, h4, h1, m15, ict_factors, atr_val):
-    """Ask Claude API if this trade is worth taking."""
-    try:
-        import requests as _req
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        if not api_key:
-            return True, "API key missing - defaulting to take"
-
-        # Skip if score gap too small
-        score_gap = abs(long_score - short_score)
-        if score_gap < 15:
-            return False, f"Score gap too small ({score_gap}pts) - skipping"
-
-        prompt = f"""You are an ICT trading analyst for NQ futures. 
-Analyze this potential {direction.upper()} trade and decide YES or NO.
-
-MARKET CONTEXT:
-- Price: {price}
-- Direction: {direction.upper()}
-- Long score: {long_score}%, Short score: {short_score}%
-- Score gap: {score_gap}pts
-- ATR: {atr_val:.1f}pts
-
-TIMEFRAME BIAS:
-- Weekly: {weekly}
-- Daily: {daily}  
-- 4H: {h4}
-- 1H: {h1}
-- 15m: {m15}
-
-ICT FACTORS: {', '.join(ict_factors) if ict_factors else 'none'}
-
-TRADER HISTORICAL EDGE (160 real trades):
-- Overall win rate: 64%
-- Hour 17:00-18:00 Cairo = 70% WR (BEST)
-- Hour 19:00 Cairo = 53% WR (AVOID)
-- Both directions work equally
-- All edge is in NY open kill zone
-
-BOT LESSONS LEARNED:
-{lessons_summary}
-
-RULES - Respond NO if:
-- 3+ higher timeframes disagree with direction
-- HTF bias conflicts with direction across 3+ timeframes
-- Volume is extremely low (below 0.5x average)
-- No FVG or OB present at all
-- Setup is weak or unclear
-- Recent lessons warn against this pattern
-
-Respond with ONLY this format:
-DECISION: YES or NO
-REASON: one sentence max
-CONFIDENCE: 0-100"""
-
-        lessons_summary = load_lessons_summary()
-        prompt = prompt.replace("{lessons_summary}", lessons_summary)
-        
-        r = _req.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json"
-            },
-            json={
-                "model": "claude-haiku-4-5-20251001",
-                "max_tokens": 100,
-                "messages": [{"role": "user", "content": prompt}]
-            },
-            timeout=8
-        )
-
-        if r.status_code != 200:
-            print(f"⚠️  AI filter API error {r.status_code} - defaulting to take")
-            return True, "API error - default take"
-
-        text = r.json()["content"][0]["text"].strip()
-        print(f"🤖 AI: {text}")
-
-        decision = "YES" in text.split("\n")[0].upper()
-        reason = ""
-        for line in text.split("\n"):
-            if "REASON:" in line:
-                reason = line.replace("REASON:", "").strip()
-        return decision, reason
-
-    except Exception as e:
-        print(f"⚠️  AI filter error: {e} - defaulting to take")
-        return True, f"Error: {e}"
-
-
-def learn_from_trade(trade):
-    """After trade closes, ask Claude what we can learn. Store lesson."""
-    try:
-        import requests as _req, json, os
-        from datetime import datetime
-        
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        if not api_key:
-            return
-        
-        # Load existing lessons
-        try:
-            with open("lessons.json") as f:
-                lessons_data = json.load(f)
-        except:
-            lessons_data = {"version": 1, "total_lessons": 0, "lessons": [], "patterns": {}}
-        
-        # Load human knowledge
-        try:
-            with open("human_knowledge.json") as f:
-                hk = json.load(f)
-        except:
-            hk = {}
-        
-        result = trade.get("result", "unknown")
-        ict_conds = trade.get("ict_conditions", {})
-        conds_met = [k for k, v in ict_conds.items() if v]
-        conds_failed = [k for k, v in ict_conds.items() if not v]
-        
-        # Entry hour in Cairo time
-        try:
-            entry_hour = int(trade.get("time", "00:00")[-8:-6])
-        except:
-            entry_hour = 0
-        
-        prompt = f"""You are analyzing a completed NQ futures trade to extract a trading lesson.
-
-TRADE RESULT: {result.upper()}
-Direction: {trade.get("direction", "?")}
-Entry: {trade.get("entry", "?")}
-PnL: {trade.get("pnl_pts", "?")} pts (${trade.get("pnl_usd", "?")})
-Session: {trade.get("session", "?")}
-Hour (Cairo): {entry_hour}:00
-HTF Bias: {trade.get("htf_bias", "?")}
-
-ICT CONDITIONS MET: {conds_met}
-ICT CONDITIONS FAILED: {conds_failed}
-
-TRADER'S HISTORICAL CONTEXT (160 manual trades):
-- Overall win rate: {hk.get("win_rate", 64)}%
-- Hour 17:00 Cairo: 70% WR
-- Hour 18:00 Cairo: 70% WR  
-- Hour 19:00 Cairo: 53% WR (avoid)
-- NY open (17-18 Cairo): 70% WR — best session
-- NY open (19 Cairo): 53% WR — weaker
-- London open: unknown for bot (learning now)
-- Asia: unknown for bot (learning now)
-- Goal: learn which sessions work for THIS bot
-
-RECENT BOT LESSONS:
-{json.dumps(lessons_data["lessons"][-5:], indent=2) if lessons_data["lessons"] else "No lessons yet"}
-
-Based on this trade, extract ONE specific lesson the bot should remember.
-Focus on: which conditions actually mattered, timing patterns, what to do differently.
-
-Respond in this exact JSON format:
-{{"lesson": "one clear sentence about what this trade teaches", "pattern": "condition_combo_or_timing", "action": "take_more" or "take_less" or "adjust_timing", "confidence": 0-100}}
-Only respond with the JSON, nothing else."""
-
-        r = _req.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 200,
-                  "messages": [{"role": "user", "content": prompt}]},
-            timeout=10
-        )
-        
-        if r.status_code != 200:
-            return
-            
-        text = r.json()["content"][0]["text"].strip()
-        lesson = json.loads(text)
-        lesson["trade_result"] = result
-        lesson["trade_time"] = trade.get("time", "")
-        lesson["session"] = trade.get("session", "")
-        lesson["conditions_met"] = conds_met
-        
-        lessons_data["lessons"].append(lesson)
-        lessons_data["total_lessons"] = len(lessons_data["lessons"])
-        
-        # Update patterns
-        pattern_key = lesson.get("pattern", "unknown")
-        if pattern_key not in lessons_data["patterns"]:
-            lessons_data["patterns"][pattern_key] = {"wins": 0, "losses": 0}
-        if result == "win":
-            lessons_data["patterns"][pattern_key]["wins"] += 1
-        else:
-            lessons_data["patterns"][pattern_key]["losses"] += 1
-        
-        with open("lessons.json", "w") as f:
-            json.dump(lessons_data, f, indent=2)
-        
-        print(f"\U0001f9e0 Lesson learned: {lesson.get('lesson', '')}")
-        
-        # Push to GitHub
-        threading.Thread(target=lambda: __import__("subprocess").run(
-            ["git", "add", "lessons.json", "human_knowledge.json"],
-            capture_output=True
-        ), daemon=True).start()
-        
-    except Exception as e:
-        print(f"\u26a0\ufe0f Learn error: {e}")
-
+# ── Trade persistence ─────────────────────────────────────────────────────────
 def load_trades():
     if os.path.exists(TRADE_LOG):
-        with open(TRADE_LOG) as f: return json.load(f)
+        try:
+            with open(TRADE_LOG) as f:
+                return json.load(f)
+        except:
+            return []
     return []
 
-def save_trades(t):
-    with open(TRADE_LOG, "w") as f: json.dump(t, f, indent=2)
+def save_trade(trade):
+    trades = load_trades()
+    trades.append(trade)
+    with open(TRADE_LOG, "w") as f:
+        json.dump(trades, f, indent=2)
 
-# ── Restore trade history on startup ─────────────────────────────────────────
-_closed = load_trades()
-state["total_trades"] = len(_closed)
-state["wins"]   = sum(1 for t in _closed if t.get("result") == "win")
-state["losses"] = sum(1 for t in _closed if t.get("result") == "loss")
-state["win_rate"] = round(state["wins"] / state["total_trades"] * 100, 1) if state["total_trades"] > 0 else 0
-state["total_pnl_usd"] = round(sum(t.get("pnl_usd", 0) for t in _closed), 2)
-print(f"📂 Loaded {state['total_trades']} trades from history")
+def get_stats():
+    trades = load_trades()
+    closed = [t for t in trades if t["result"] in ("win", "loss")]
+    wins = [t for t in closed if t["result"] == "win"]
+    total_pnl = sum(t["pnl_pts"] for t in closed) * PNL_PER_PT
+    wr = round(len(wins) / len(closed) * 100, 1) if closed else 0.0
+    return len(closed), len(wins), len(closed) - len(wins), wr, total_pnl
 
 # ── Indicators ────────────────────────────────────────────────────────────────
-def calc_ema(s, p): return s.ewm(span=p, adjust=False).mean()
+def calc_ema(series, n):
+    return series.ewm(span=n, adjust=False).mean()
 
-def calc_rsi(s, p=14):
-    d = s.diff()
-    g = d.clip(lower=0); l = (-d).clip(lower=0)
-    ag = g.ewm(com=p-1, adjust=False).mean()
-    al = l.ewm(com=p-1, adjust=False).mean()
-    return (100 - 100 / (1 + ag / al.replace(0, np.nan))).fillna(50)
+def calc_rsi(series, n=14):
+    d = series.diff()
+    g = d.clip(lower=0).rolling(n).mean()
+    l = (-d.clip(upper=0)).rolling(n).mean()
+    rs = g / l.replace(0, 0.001)
+    return float((100 - 100 / (1 + rs)).iloc[-1])
 
-def calc_atr(h, l, c, p=14):
-    tr = pd.concat([h-l, (h-c.shift()).abs(), (l-c.shift()).abs()], axis=1).max(axis=1)
-    return tr.ewm(span=p, adjust=False).mean()
+def get_mtf(closes):
+    """EMA-based MTF bias — same logic as backtest_v2"""
+    c = pd.Series(closes)
+    weekly = "bull" if calc_ema(c, 576).iloc[-1] > calc_ema(c, 1440).iloc[-1] else "bear"
+    daily  = "bull" if calc_ema(c, 288).iloc[-1] > calc_ema(c, 576).iloc[-1]  else "bear"
+    h4     = "bull" if calc_ema(c, 48).iloc[-1]  > calc_ema(c, 96).iloc[-1]   else "bear"
+    h1     = "bull" if calc_ema(c, 12).iloc[-1]  > calc_ema(c, 24).iloc[-1]   else "bear"
+    return weekly, daily, h4, h1
 
-# ── Price fetch (multi-timeframe) ─────────────────────────────────────────────
-TF_MAP = {
-    "weekly":  ("1wk", "1y"),
-    "daily":   ("1d",  "6mo"),
-    "4h":      ("1h",  "60d"),   # Yahoo doesn't have 4h; we resample from 1h
-    "1h":      ("1h",  "30d"),
-    "15m":     ("15m", "5d"),
-    "5m":      ("5m",  "2d"),
-}
+def get_session(dt):
+    h = dt.hour * 60 + dt.minute
+    if 360  <= h < 480:  return "london_open", True
+    if 480  <= h < 720:  return "london",      True
+    if 780  <= h < 960:  return "ny_open",     True
+    if 960  <= h < 1080: return "ny_pm",       True
+    return "other", False
 
-def fetch_tf(interval, range_str, n_bars=100):
-    """Fetch bars using yfinance — handles cookies/crumbs automatically, no IP blocking."""
-    try:
-        period_map = {"2d":"2d","5d":"5d","30d":"1mo","6mo":"6mo","2y":"2y"}
-        period = period_map.get(range_str, "1mo")
-        df = yf.download("NQ=F", period=period, interval=interval,
-                         progress=False, auto_adjust=True, timeout=30)
-        if df is None or len(df) < 5:
-            return None
-        df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
-        df = df[["Open","High","Low","Close","Volume"]].dropna()
-        return df.tail(n_bars)
-    except Exception as e:
-        print(f"yfinance fetch_tf error ({interval}): {e}")
+def find_fvg(df_slice, direction):
+    for i in range(2, min(30, len(df_slice) - 1)):
+        c1 = df_slice.iloc[-i - 1]
+        c3 = df_slice.iloc[-i + 1]
+        if direction == "long":
+            lo, hi = float(c1["high"]), float(c3["low"])
+            if hi > lo:
+                return lo, hi
+        else:
+            hi, lo = float(c1["low"]), float(c3["high"])
+            if hi < lo:
+                return lo, hi
+    return None, None
+
+def find_ob(df_slice, direction):
+    avg_range = float((df_slice.tail(20)["high"] - df_slice.tail(20)["low"]).mean())
+    for i in range(3, min(30, len(df_slice))):
+        bar = df_slice.iloc[-i]
+        br = float(bar["high"]) - float(bar["low"])
+        if br > avg_range * 1.5:
+            return float(bar["low"]), float(bar["high"])
+    return None, None
+
+# ── Data fetch ────────────────────────────────────────────────────────────────
+def fetch_bars():
+    global bars_buffer, last_bar_time
+    url = "https://query1.finance.yahoo.com/v8/finance/chart/NQ=F?interval=5m&range=5d"
+    r = req.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+    js = r.json()
+    res = js["chart"]["result"][0]
+    ts  = res["timestamp"]
+    q   = res["indicators"]["quote"][0]
+    df = pd.DataFrame({
+        "close":  q["close"],
+        "high":   q["high"],
+        "low":    q["low"],
+        "open":   q["open"],
+        "volume": q["volume"],
+    }, index=pd.to_datetime(ts, unit="s", utc=True)).dropna()
+
+    if df.empty or len(df) < 50:
         return None
 
-def fetch_all_timeframes():
-    global last_htf_fetch, cached_htf
-    now = time.time()
-    bars = {}
+    # Only update if we have a new bar
+    latest = df.index[-1]
+    if last_bar_time is not None and latest == last_bar_time:
+        return None  # no new bar
 
-    # ── Fast timeframes: 5m every cycle, 15m every cycle ──────────────────────
-    bars["5m"]  = fetch_tf("5m",  "2d",  100)
-    time.sleep(2)
-    bars["15m"] = fetch_tf("15m", "5d",  100)
-    time.sleep(2)
+    last_bar_time = latest
+    bars_buffer = df
+    return df
 
-    # ── Slow timeframes: only refresh every HTF_INTERVAL ──────────────────────
-    if now - last_htf_fetch > HTF_INTERVAL or not cached_htf:
-        time.sleep(2)
-        bars["1h"]     = fetch_tf("1h",  "30d", 200)
-        time.sleep(2)
-        bars["daily"]  = fetch_tf("1d",  "6mo", 120)
-        time.sleep(2)
-        bars["weekly"] = fetch_tf("1wk", "2y",  52)
-        time.sleep(2)
+# ── Check active trade ────────────────────────────────────────────────────────
+def check_active_trade(df):
+    at = state.get("active_trade")
+    if not at or at["result"] != "open":
+        return
 
-        if bars["1h"] is not None and len(bars["1h"]) >= 4:
-            try:
-                bars["4h"] = bars["1h"].resample("4h").agg({
-                    "Open": "first", "High": "max",
-                    "Low": "min", "Close": "last", "Volume": "sum"
-                }).dropna().tail(60)
-            except:
-                bars["4h"] = None
-        else:
-            bars["4h"] = None
+    cur_high = float(df.iloc[-1]["high"])
+    cur_low  = float(df.iloc[-1]["low"])
+    price    = float(df.iloc[-1]["close"])
 
-        cached_htf = {k: bars[k] for k in ["weekly","daily","1h","4h"] if k in bars}
-        last_htf_fetch = now
-        print("📊 HTF data refreshed via Yahoo Finance")
+    if at["direction"] == "long":
+        if cur_low  <= at["sl"]: _close_trade("loss", at, at["sl"])
+        elif cur_high >= at["tp"]: _close_trade("win",  at, at["tp"])
     else:
-        bars.update(cached_htf)
+        if cur_high >= at["sl"]: _close_trade("loss", at, at["sl"])
+        elif cur_low  <= at["tp"]: _close_trade("win",  at, at["tp"])
 
-    return bars
-
-# ── ICT Concepts ──────────────────────────────────────────────────────────────
-
-def detect_fvg(bars, direction=None, lookback=30):
-    """
-    Detect Fair Value Gaps in last N bars.
-    FVG bullish: bar[i].low > bar[i-2].high  (gap up — unfilled space)
-    FVG bearish: bar[i].high < bar[i-2].low  (gap down — unfilled space)
-    Returns list of dicts with type, top, bottom, midpoint, index, filled
-    """
-    if bars is None or len(bars) < 3:
-        return []
-    fvgs = []
-    df = bars.tail(lookback).reset_index(drop=True)
-    price_now = df["Close"].iloc[-1]
-
-    for i in range(2, len(df)):
-        high_prev2 = df["High"].iloc[i-2]
-        low_prev2  = df["Low"].iloc[i-2]
-        high_curr  = df["High"].iloc[i]
-        low_curr   = df["Low"].iloc[i]
-
-        # Bullish FVG: current bar's low > 2 bars ago's high
-        if low_curr > high_prev2:
-            gap_top    = low_curr
-            gap_bottom = high_prev2
-            midpoint   = (gap_top + gap_bottom) / 2
-            filled     = price_now <= gap_top and price_now >= gap_bottom
-            touching   = abs(price_now - midpoint) / midpoint < 0.002  # within 0.2%
-            if direction is None or direction == "bullish":
-                fvgs.append({
-                    "type": "bullish", "top": round(gap_top, 2),
-                    "bottom": round(gap_bottom, 2), "mid": round(midpoint, 2),
-                    "filled": filled, "touching": touching, "bar_idx": i,
-                    "age": len(df) - i,
-                })
-
-        # Bearish FVG: current bar's high < 2 bars ago's low
-        if high_curr < low_prev2:
-            gap_top    = low_prev2
-            gap_bottom = high_curr
-            midpoint   = (gap_top + gap_bottom) / 2
-            filled     = price_now <= gap_top and price_now >= gap_bottom
-            touching   = abs(price_now - midpoint) / midpoint < 0.002
-            if direction is None or direction == "bearish":
-                fvgs.append({
-                    "type": "bearish", "top": round(gap_top, 2),
-                    "bottom": round(gap_bottom, 2), "mid": round(midpoint, 2),
-                    "filled": filled, "touching": touching, "bar_idx": i,
-                    "age": len(df) - i,
-                })
-
-    return fvgs
-
-def detect_order_blocks(bars, lookback=50):
-    """
-    Order block: last significant up/down candle before a strong move away.
-    Bullish OB: last bearish candle before strong bullish move
-    Bearish OB: last bullish candle before strong bearish move
-    """
-    if bars is None or len(bars) < 10:
-        return []
-    obs = []
-    df = bars.tail(lookback).reset_index(drop=True)
-    price_now = df["Close"].iloc[-1]
-    atr = calc_atr(df["High"], df["Low"], df["Close"]).iloc[-1]
-
-    for i in range(1, len(df) - 2):
-        c0 = df.iloc[i]
-        c1 = df.iloc[i+1]
-        c2 = df.iloc[i+2] if i+2 < len(df) else None
-
-        # Bullish OB: bearish candle followed by strong bullish move
-        if c0["Close"] < c0["Open"]:  # bearish candle
-            move = c1["Close"] - c0["Close"]
-            if move > atr * 1.5:  # strong bullish move after
-                near = abs(price_now - c0["Low"]) < atr * 2
-                obs.append({
-                    "type": "bullish",
-                    "top": round(c0["Open"], 2),
-                    "bottom": round(c0["Low"], 2),
-                    "mid": round((c0["Open"] + c0["Low"]) / 2, 2),
-                    "near": near, "age": len(df) - i,
-                })
-
-        # Bearish OB: bullish candle followed by strong bearish move
-        if c0["Close"] > c0["Open"]:  # bullish candle
-            move = c0["Close"] - c1["Close"]
-            if move > atr * 1.5:  # strong bearish move after
-                near = abs(price_now - c0["High"]) < atr * 2
-                obs.append({
-                    "type": "bearish",
-                    "top": round(c0["High"], 2),
-                    "bottom": round(c0["Close"], 2),
-                    "mid": round((c0["High"] + c0["Close"]) / 2, 2),
-                    "near": near, "age": len(df) - i,
-                })
-
-    return obs[-5:] if obs else []  # last 5 order blocks
-
-def detect_liquidity_sweep(bars, lookback=40):
-    """
-    Liquidity sweep: price takes out equal highs or equal lows (within 0.1%)
-    then quickly reverses. This is a stop hunt.
-    Returns: swept_high, swept_low, sweep_type, reclaimed
-    """
-    if bars is None or len(bars) < 15:
-        return {"swept": False, "type": None, "level": None, "reclaimed": False}
-
-    df = bars.tail(lookback).reset_index(drop=True)
-    price_now = df["Close"].iloc[-1]
-    atr = calc_atr(df["High"], df["Low"], df["Close"]).iloc[-1]
-
-    # Find equal highs (within 0.15% of each other) in last 20 bars
-    recent = df.iloc[-20:-1]
-    highs = recent["High"].values
-    lows  = recent["Low"].values
-
-    # Check if last candle swept above a previous high then closed below
-    last_high  = df["High"].iloc[-1]
-    last_close = df["Close"].iloc[-1]
-    last_open  = df["Open"].iloc[-1]
-
-    # Sweep of highs: wick above recent swing high, closed back below
-    swing_high = recent["High"].max()
-    if last_high > swing_high and last_close < swing_high:
-        return {
-            "swept": True, "type": "high_sweep",
-            "level": round(swing_high, 2),
-            "reclaimed": True,
-            "extreme": last_high - swing_high > atr * 0.5,
-        }
-
-    # Sweep of lows: wick below recent swing low, closed back above
-    swing_low = recent["Low"].min()
-    last_low = df["Low"].iloc[-1]
-    if last_low < swing_low and last_close > swing_low:
-        return {
-            "swept": True, "type": "low_sweep",
-            "level": round(swing_low, 2),
-            "reclaimed": True,
-            "extreme": swing_low - last_low > atr * 0.5,
-        }
-
-    return {"swept": False, "type": None, "level": None, "reclaimed": False, "extreme": False}
-
-def detect_market_structure(bars, lookback=50):
-    """
-    Market structure: track swing highs/lows to determine BOS/CHoCH.
-    Bullish structure: series of HH + HL
-    Bearish structure: series of LH + LL
-    Returns: structure (bullish/bearish/ranging), last_bos, choch
-    """
-    if bars is None or len(bars) < 20:
-        return {"structure": "ranging", "bos": None, "choch": False, "swing_high": None, "swing_low": None}
-
-    df = bars.tail(lookback).reset_index(drop=True)
-
-    # Find swing highs and lows (simple: local max/min over 5 bars)
-    highs = []
-    lows  = []
-    for i in range(2, len(df) - 2):
-        if df["High"].iloc[i] == df["High"].iloc[i-2:i+3].max():
-            highs.append((i, df["High"].iloc[i]))
-        if df["Low"].iloc[i] == df["Low"].iloc[i-2:i+3].min():
-            lows.append((i, df["Low"].iloc[i]))
-
-    if len(highs) < 2 or len(lows) < 2:
-        return {"structure": "ranging", "bos": None, "choch": False,
-                "swing_high": None, "swing_low": None}
-
-    # Last 2 swing highs and lows
-    last_highs = highs[-2:]
-    last_lows  = lows[-2:]
-
-    hh = last_highs[-1][1] > last_highs[-2][1]  # higher high
-    hl = last_lows[-1][1]  > last_lows[-2][1]   # higher low
-    lh = last_highs[-1][1] < last_highs[-2][1]  # lower high
-    ll = last_lows[-1][1]  < last_lows[-2][1]   # lower low
-
-    if hh and hl:
-        structure = "bullish"
-    elif lh and ll:
-        structure = "bearish"
-    else:
-        structure = "ranging"
-
-    # BOS: price breaks above last swing high (bullish BOS) or below last swing low (bearish BOS)
-    price_now = df["Close"].iloc[-1]
-    bos = None
-    if price_now > last_highs[-1][1]:
-        bos = "bullish_bos"
-    elif price_now < last_lows[-1][1]:
-        bos = "bearish_bos"
-
-    # CHoCH: structure changes (was bullish, now bearish signal or vice versa)
-    choch = (structure == "bullish" and ll) or (structure == "bearish" and hh)
-
-    return {
-        "structure": structure, "bos": bos, "choch": choch,
-        "swing_high": round(last_highs[-1][1], 2),
-        "swing_low":  round(last_lows[-1][1], 2),
-    }
-
-def detect_absorption(bars_5m, lookback=10):
-    """
-    Absorption: large volume candle with small body at a key level.
-    Big bid: bullish absorption (down candle with huge volume, closes near open)
-    Big offer: bearish absorption
-    """
-    if bars_5m is None or len(bars_5m) < 5:
-        return {"absorbed": False, "type": None}
-
-    df = bars_5m.tail(lookback).reset_index(drop=True)
-    vol_avg = df["Volume"].mean()
-    last = df.iloc[-1]
-
-    body_pct = abs(last["Close"] - last["Open"]) / (last["High"] - last["Low"] + 0.001)
-    high_vol  = last["Volume"] > vol_avg * 1.5
-
-    if high_vol and body_pct < 0.35:
-        # Small body + high volume = absorption
-        direction = "bullish" if last["Close"] >= last["Open"] else "bearish"
-        return {"absorbed": True, "type": direction, "vol_ratio": round(last["Volume"] / vol_avg, 1)}
-
-    return {"absorbed": False, "type": None, "vol_ratio": 0}
-
-def get_kill_zone():
-    """Kill zone detection using ET (Eastern Time = UTC-4 in summer, UTC-5 in winter).
-    All times below are ET converted to UTC minutes for comparison."""
-    now  = datetime.now(timezone.utc)
-    mins = now.hour * 60 + now.minute  # UTC minutes since midnight
-
-    # London open:  2:00-5:00 AM ET  = 06:00-09:00 UTC = 360-540 mins
-    if 360 <= mins < 540:
-        return "london_open", False  # v2: blocked — 28-42% WR drag
-
-    # London main: 9:00 AM - 12:00 PM UTC = 540-720 mins (your 57.9% WR session)
-    if 540 <= mins < 810:
-        return "london", True
-
-    # NY open:      9:30-11:00 AM ET = 13:30-15:00 UTC = 810-900 mins
-    if 810 <= mins < 900:
-        return "ny_open", True
-
-    # London close: 10:00-12:00 PM ET = 14:00-16:00 UTC = 840-960 mins
-    # (overlaps NY open — included as bonus kill zone)
-    if 900 <= mins < 960:
-        return "london_close", True
-
-    # NY PM:        1:30-3:00 PM ET  = 17:30-19:00 UTC = 1050-1140 mins
-    if 1050 <= mins < 1140:
-        return "ny_pm", True
-
-    # Asia:         8:00 PM - 2:00 AM ET = 00:00-06:00 UTC = 0-360 mins
-    if mins < 360 or mins >= 1380:
-        return "asia", False  # v2: Asia blocked
-
-    return "transition", False  # block between sessions
-
-# ── Full MTF ICT Analysis ─────────────────────────────────────────────────────
-
-
-def ict_score(df, direction, mtf, kz_active):
-    """Pure ICT rule-based scoring. Returns (score 0-6, conditions dict)."""
-    conds = {}
-    
-    if len(df) < 20:
-        return 0, conds
-    
-    last   = df.iloc[-1]
-    prev   = df.iloc[-2]
-    recent = df.tail(20)
-    
-    close  = float(last['close'])
-    high   = float(last['high'])
-    low    = float(last['low'])
-    volume = float(last.get('volume', 0))
-    avg_vol = float(recent['volume'].mean()) if 'volume' in df.columns else 0
-    
-    # 1. HTF Bias — Weekly + Daily + 4H must all agree
-    weekly = mtf.get('weekly', '')
-    daily  = mtf.get('daily', '')
-    h4     = mtf.get('4h', '')
-    
-    if direction == 'long':
-        htf_ok = (weekly == 'bullish' and daily == 'bullish' and h4 == 'bullish')
-    else:
-        htf_ok = (weekly == 'bearish' and daily == 'bearish' and h4 == 'bearish')
-    conds['htf_aligned'] = htf_ok
-    
-    # 2. Kill zone active
-    conds['kill_zone'] = kz_active
-    
-    # 3. FVG — check if recent price is inside an unfilled gap
-    fvg_hit = False
-    for i in range(2, min(15, len(df))):
-        c1 = df.iloc[-i-1]
-        c2 = df.iloc[-i]
-        c3 = df.iloc[-i+1] if i > 1 else last
-        gap_low  = float(c1['high'])
-        gap_high = float(c3['low'])
-        if gap_high > gap_low:  # bullish FVG
-            if direction == 'long' and gap_low <= close <= gap_high:
-                fvg_hit = True; break
-        gap_low2  = float(c3['high'])
-        gap_high2 = float(c1['low'])
-        if gap_high2 < gap_low2:  # bearish FVG
-            if direction == 'short' and gap_high2 <= close <= gap_low2:
-                fvg_hit = True; break
-    conds['fvg_hit'] = fvg_hit
-    
-    # 4. Order Block — large candle in opposite direction before move
-    ob_hit = False
-    for i in range(3, min(20, len(df))):
-        bar = df.iloc[-i]
-        bar_range = float(bar['high']) - float(bar['low'])
-        avg_range = float((df.tail(20)['high'] - df.tail(20)['low']).mean())
-        if bar_range > avg_range * 1.5:  # significant candle
-            ob_high = float(bar['high'])
-            ob_low  = float(bar['low'])
-            if direction == 'long' and ob_low <= close <= ob_high:
-                ob_hit = True; break
-            if direction == 'short' and ob_low <= close <= ob_high:
-                ob_hit = True; break
-    conds['ob_hit'] = ob_hit
-    
-    # 5. Structure break (BOS) — recent swing broken
-    swing_highs = df.tail(10)['high']
-    swing_lows  = df.tail(10)['low']
-    if direction == 'long':
-        bos = close > float(swing_highs.iloc[-5:-1].max())
-    else:
-        bos = close < float(swing_lows.iloc[-5:-1].min())
-    conds['bos'] = bos
-    
-    # 6. Volume — above average
-    vol_ok = (avg_vol > 0 and volume > avg_vol * 1.5)  # v2: 1.5x spike required
-    conds['volume_ok'] = vol_ok
-    
-    # 7. Liquidity sweep — recent high/low taken then reversed
-    sweep = False
-    if direction == 'long':
-        recent_low = float(df.tail(5)['low'].min())
-        if float(df.iloc[-2]['low']) < recent_low and close > float(df.iloc[-2]['low']):
-            sweep = True
-    else:
-        recent_high = float(df.tail(5)['high'].max())
-        if float(df.iloc[-2]['high']) > recent_high and close < float(df.iloc[-2]['high']):
-            sweep = True
-    conds['liquidity_sweep'] = sweep
-    
-    score = sum(1 for v in conds.values() if v)
-    return score, conds
-
-def run_ict_analysis(all_bars, direction, price_now):
-    """
-    Run full ICT analysis across all timeframes.
-    Returns: ict_score (int), ict_factors (list), trade_type (str), mtf_summary (dict)
-    """
-    ict_score  = 0
-    factors    = []
-    trade_type = "none"
-
-    # ── 1. Weekly structure ───────────────────────────────────────────────────
-    w_struct = detect_market_structure(all_bars.get("weekly"), lookback=30)
-    w_fvgs   = detect_fvg(all_bars.get("weekly"), lookback=20)
-
-    w_bullish = w_struct["structure"] == "bullish"
-    w_bearish = w_struct["structure"] == "bearish"
-
-    w_fvg_target = None
-    for fvg in w_fvgs:
-        if not fvg["filled"]:
-            w_fvg_target = fvg
-            break  # closest unfilled FVG
-
-    factors.append({
-        "name": "Weekly Structure",
-        "value": w_struct["structure"].upper(),
-        "aligned": (w_bullish and direction == "long") or (w_bearish and direction == "short"),
-        "detail": f"{'HH/HL' if w_bullish else 'LH/LL' if w_bearish else 'Ranging'}",
-    })
-
-    # ── 2. Daily structure + FVG targets ─────────────────────────────────────
-    d_struct = detect_market_structure(all_bars.get("daily"), lookback=60)
-    d_fvgs   = detect_fvg(all_bars.get("daily"), lookback=40)
-    d_obs    = detect_order_blocks(all_bars.get("daily"), lookback=60)
-
-    d_bullish = d_struct["structure"] == "bullish"
-    d_bearish = d_struct["structure"] == "bearish"
-
-    # Find nearest unfilled daily FVG as target
-    d_fvg_target = None
-    for fvg in sorted(d_fvgs, key=lambda x: abs(x["mid"] - price_now)):
-        if not fvg["filled"]:
-            d_fvg_target = fvg
-            break
-
-    # Check if price is near a daily order block
-    d_ob_near = any(ob["near"] and ob["type"] == ("bullish" if direction=="long" else "bearish")
-                    for ob in d_obs)
-
-    factors.append({
-        "name": "Daily Structure",
-        "value": d_struct["structure"].upper(),
-        "aligned": (d_bullish and direction == "long") or (d_bearish and direction == "short"),
-        "detail": f"Target FVG: {d_fvg_target['mid'] if d_fvg_target else 'None'}",
-    })
-
-    # ── 3. 4H structure ───────────────────────────────────────────────────────
-    h4_struct = detect_market_structure(all_bars.get("4h"), lookback=40)
-    h4_fvgs   = detect_fvg(all_bars.get("4h"), lookback=30)
-
-    h4_bullish = h4_struct["structure"] == "bullish"
-    h4_bearish = h4_struct["structure"] == "bearish"
-
-    # FVG respect: are we respecting bullish or bearish FVGs on 4H?
-    h4_bullish_fvgs_respected = any(
-        not fvg["filled"] and fvg["type"] == "bullish" for fvg in h4_fvgs
-    )
-    h4_bearish_fvgs_respected = any(
-        not fvg["filled"] and fvg["type"] == "bearish" for fvg in h4_fvgs
-    )
-
-    factors.append({
-        "name": "4H Structure",
-        "value": h4_struct["structure"].upper(),
-        "aligned": (h4_bullish and direction == "long") or (h4_bearish and direction == "short"),
-        "detail": f"BOS: {h4_struct['bos'] or 'None'}",
-    })
-
-    # ── 4. 1H structure + FVG respect/disrespect ─────────────────────────────
-    h1_struct = detect_market_structure(all_bars.get("1h"), lookback=50)
-    h1_fvgs   = detect_fvg(all_bars.get("1h"), lookback=30)
-
-    h1_bullish = h1_struct["structure"] == "bullish"
-    h1_bearish = h1_struct["structure"] == "bearish"
-
-    # Key: are we respecting or disrespecting FVGs?
-    # Bearish structure = disrespecting bullish FVGs, respecting bearish FVGs
-    h1_bullish_fvg_touching = any(fvg["touching"] and fvg["type"] == "bullish" for fvg in h1_fvgs)
-    h1_bearish_fvg_touching = any(fvg["touching"] and fvg["type"] == "bearish" for fvg in h1_fvgs)
-
-    factors.append({
-        "name": "1H Structure",
-        "value": h1_struct["structure"].upper(),
-        "aligned": (h1_bullish and direction == "long") or (h1_bearish and direction == "short"),
-        "detail": f"CHoCH: {'Yes' if h1_struct['choch'] else 'No'}",
-    })
-
-    # ── 5. 15m structure + liquidity sweep ───────────────────────────────────
-    m15_struct = detect_market_structure(all_bars.get("15m"), lookback=40)
-    m15_sweep  = detect_liquidity_sweep(all_bars.get("15m"), lookback=30)
-
-    m15_bullish = m15_struct["structure"] == "bullish"
-    m15_bearish = m15_struct["structure"] == "bearish"
-
-    factors.append({
-        "name": "15m Sweep",
-        "value": m15_sweep["type"].upper().replace("_", " ") if m15_sweep["swept"] else "NONE",
-        "aligned": m15_sweep["swept"],
-        "detail": f"Level: {m15_sweep['level'] or '—'} Extreme: {'Yes' if m15_sweep.get('extreme') else 'No'}",
-    })
-
-    # ── 6. 5m FVG + absorption + IFVG ────────────────────────────────────────
-    m5_fvgs  = detect_fvg(all_bars.get("5m"), lookback=30)
-    m5_abs   = detect_absorption(all_bars.get("5m"), lookback=10)
-    m5_sweep = detect_liquidity_sweep(all_bars.get("5m"), lookback=20)
-
-    m5_fvg_touch = any(
-        fvg["touching"] and fvg["type"] == ("bullish" if direction=="long" else "bearish")
-        for fvg in m5_fvgs
-    )
-
-    # IFVG: price is in an inverted FVG (previously bearish FVG now acting as support)
-    m5_ifvg = any(
-        fvg["touching"] and fvg["type"] != ("bullish" if direction=="long" else "bearish")
-        for fvg in m5_fvgs
-    )
-
-    factors.append({
-        "name": "5m FVG",
-        "value": "TOUCHING" if m5_fvg_touch else "NOT TOUCHING",
-        "aligned": m5_fvg_touch,
-        "detail": f"Absorption: {'Yes ' + m5_abs['type'] if m5_abs['absorbed'] else 'No'}",
-    })
-
-    # ── Kill zone ─────────────────────────────────────────────────────────────
-    kz_name, kz_active = get_kill_zone()
-    factors.append({
-        "name": "Kill Zone",
-        "value": kz_name.upper().replace("_", " "),
-        "aligned": kz_active,
-        "detail": "High probability window" if kz_active else "Outside kill zone",
-    })
-
-    # ── Liquidity direction (external → internal) ─────────────────────────────
-    # Price should be moving from external liquidity (swing H/L) toward internal (FVG)
-    d_swing_high = d_struct.get("swing_high")
-    d_swing_low  = d_struct.get("swing_low")
-
-    moving_to_target = False
-    if direction == "long" and d_swing_high and price_now < d_swing_high:
-        moving_to_target = True  # bullish, moving toward swing high (external)
-    elif direction == "short" and d_swing_low and price_now > d_swing_low:
-        moving_to_target = True  # bearish, moving toward swing low (external)
-
-    factors.append({
-        "name": "Liquidity Draw",
-        "value": "ALIGNED" if moving_to_target else "NO TARGET",
-        "aligned": moving_to_target,
-        "detail": f"Target: {'High' if direction=='long' else 'Low'} @ {d_swing_high if direction=='long' else d_swing_low}",
-    })
-
-    # ── SCORING ───────────────────────────────────────────────────────────────
-
-    # Count aligned timeframes
-    struct_alignment = sum([
-        (w_bullish and direction=="long") or (w_bearish and direction=="short"),
-        (d_bullish and direction=="long") or (d_bearish and direction=="short"),
-        (h4_bullish and direction=="long") or (h4_bearish and direction=="short"),
-        (h1_bullish and direction=="long") or (h1_bearish and direction=="short"),
-        (m15_bullish and direction=="long") or (m15_bearish and direction=="short"),
-    ])
-
-    # HTF agreement (weekly + daily)
-    htf_agree = (
-        (w_bullish and d_bullish and direction=="long") or
-        (w_bearish and d_bearish and direction=="short")
-    )
-
-    if htf_agree:             ict_score += 15
-    if struct_alignment >= 4: ict_score += 10
-    elif struct_alignment == 3: ict_score += 5
-    elif struct_alignment <= 1: ict_score -= 20  # strong conflict
-
-    if d_fvg_target:          ict_score += 10   # daily FVG target identified
-    if d_ob_near:             ict_score += 8    # near daily OB
-    if moving_to_target:      ict_score += 10   # moving toward liquidity
-    if m5_fvg_touch:          ict_score += 15   # 5m FVG entry zone
-    if m5_abs["absorbed"]:    ict_score += 15   # absorption candle
-    if m5_ifvg:               ict_score += 10   # IFVG entry
-    if kz_active:             ict_score += 5    # kill zone
-
-    # Against HTF bias — strong penalty
-    htf_against = (
-        (w_bearish and direction=="long") or
-        (w_bullish and direction=="short")
-    )
-    if htf_against:           ict_score -= 25
-
-    # CHoCH on 1H is good for reversals
-    if h1_struct["choch"]:    ict_score += 8
-
-    # ── Trade type detection ──────────────────────────────────────────────────
-    is_continuation = (
-        struct_alignment >= 3 and
-        m5_fvg_touch and
-        m5_abs["absorbed"] and
-        moving_to_target
-    )
-
-    extreme_sweep = (
-        m15_sweep["swept"] and
-        m15_sweep.get("extreme", False) and
-        h1_struct["choch"]
-    )
-
-    is_reversal = (
-        extreme_sweep and
-        struct_alignment <= 2 and
-        m5_fvg_touch
-    )
-
-    if is_continuation and is_reversal:
-        trade_type = "continuation+reversal"
-        ict_score += 5  # both signals = extra confirmation
-    elif is_continuation:
-        trade_type = "continuation"
-    elif is_reversal:
-        trade_type = "reversal"
-        ict_score += 10  # reversal bonus (harder to get, more reliable)
-    else:
-        trade_type = "no_setup"
-        ict_score -= 10  # no clear ICT setup
-
-    # Cap ICT score
-    ict_score = max(-30, min(30, ict_score))
-
-    mtf_summary = {
-        "weekly":  w_struct["structure"],
-        "daily":   d_struct["structure"],
-        "4h":      h4_struct["structure"],
-        "1h":      h1_struct["structure"],
-        "15m":     m15_struct["structure"],
-        "kz":      kz_name,
-        "kz_active": kz_active,
-        "d_fvg_target": d_fvg_target["mid"] if d_fvg_target else None,
-        "sweep":   m15_sweep,
-        "absorption": m5_abs,
-        "alignment": struct_alignment,
-        "htf_agree": htf_agree,
-    }
-
-    return ict_score, factors, trade_type, mtf_summary
-
-# ── Feature engineering ───────────────────────────────────────────────────────
-def engineer(raw):
-    d = raw.copy()
-    d["bias_aligned"]    = int((d["htf_bias"]=="bullish" and d["trade_direction"]=="long") or
-                               (d["htf_bias"]=="bearish" and d["trade_direction"]=="short"))
-    d["ema_aligned"]     = int((d["ema_diff"]>0 and d["trade_direction"]=="long") or
-                               (d["ema_diff"]<0 and d["trade_direction"]=="short"))
-    sq                   = {"london":2,"newyork":2,"asia":1,"overnight":0}
-    d["session_quality"] = sq.get(d["session"], 0)
-    d["bias_x_session"]  = d["bias_aligned"] * d["session_quality"]
-    d["rsi_dist_50"]     = abs(d["rsi_at_entry"] - 50)
-    d["ema_abs"]         = abs(d["ema_diff"])
-    r = d["rsi_at_entry"]
-    d["rsi_zone"] = ("oversold" if r<=35 else "low_neutral" if r<=45
-                     else "mid_neutral" if r<=55 else "high_neutral" if r<=65 else "overbought")
-    v = d["volume_ratio"]
-    d["vol_tier"] = ("very_low" if v<=0.8 else "low" if v<=1.0
-                     else "normal" if v<=1.2 else "high" if v<=1.5 else "very_high")
-    for col in ["timeframe","session","htf_bias","trade_direction","rsi_zone","vol_tier"]:
-        le = les[col]; val = str(d[col])
-        d[col+"_enc"] = int(le.transform([val])[0]) if val in le.classes_ else 0
-    return pd.DataFrame([d])[FCOLS]
-
-def get_base_factors(raw):
-    f  = []
-    al = ((raw["htf_bias"]=="bullish" and raw["trade_direction"]=="long") or
-          (raw["htf_bias"]=="bearish" and raw["trade_direction"]=="short"))
-    f.append({"name":"HTF Bias","rating":"good" if al else "bad",
-               "detail":f"{'Aligns' if al else 'Conflicts'} with {raw['trade_direction']}"})
-    r = raw["rsi_at_entry"]
-    f.append({"name":"RSI","rating":"good" if 45<=r<=65 else "neutral" if 35<r<70 else "bad","detail":f"{r:.1f}"})
-    ed = raw["ema_diff"]
-    eo = (ed>0 and raw["trade_direction"]=="long") or (ed<0 and raw["trade_direction"]=="short")
-    f.append({"name":"EMA","rating":"good" if eo else "bad","detail":f"{ed:+.1f}pts"})
-    vr = raw["volume_ratio"]
-    f.append({"name":"Volume","rating":"good" if vr>1.2 else "neutral" if vr>0.8 else "bad","detail":f"{vr:.2f}x"})
-    s = raw["session"]
-    f.append({"name":"Session","rating":"good" if s in("london","newyork") else "neutral" if s=="asia" else "bad",
-               "detail":s.capitalize()})
-    return f
-
-# ── Stats ─────────────────────────────────────────────────────────────────────
-def calc_stats(trades):
-    closed = [t for t in trades if t.get("result") in ("win","loss")]
-    if not closed:
-        return {"total":0,"wins":0,"losses":0,"win_rate":0,"total_pnl_usd":0.0,
-                "avg_win_pts":0.0,"avg_loss_pts":0.0,"best_trade":0.0,"worst_trade":0.0,
-                "by_session":{},"by_score":{},"by_trade_type":{}}
-    wins    = [t for t in closed if t["result"]=="win"]
-    losses  = [t for t in closed if t["result"]=="loss"]
-    pnl_pts = [t.get("pnl_pts",0) or 0 for t in closed]
-
-    by_session = {}
-    for t in closed:
-        s = t.get("session","unknown")
-        if s not in by_session: by_session[s] = {"wins":0,"total":0,"pnl":0.0}
-        by_session[s]["total"] += 1
-        by_session[s]["pnl"]   += (t.get("pnl_pts",0) or 0) * MNQ_PTS_TO_USD
-        if t["result"]=="win": by_session[s]["wins"] += 1
-    for s in by_session:
-        d = by_session[s]; d["wr"] = round(d["wins"]/d["total"]*100,1) if d["total"] else 0
-
-    by_score = {}
-    for t in closed:
-        sc = t.get("score",0) or 0
-        b  = f"{int(sc//10)*10}-{int(sc//10)*10+10}"
-        if b not in by_score: by_score[b] = {"wins":0,"total":0}
-        by_score[b]["total"] += 1
-        if t["result"]=="win": by_score[b]["wins"] += 1
-    for b in by_score:
-        d = by_score[b]; d["wr"] = round(d["wins"]/d["total"]*100,1) if d["total"] else 0
-
-    # By trade type
-    by_trade_type = {}
-    for t in closed:
-        tt = t.get("trade_type","unknown")
-        if tt not in by_trade_type: by_trade_type[tt] = {"wins":0,"total":0}
-        by_trade_type[tt]["total"] += 1
-        if t["result"]=="win": by_trade_type[tt]["wins"] += 1
-    for tt in by_trade_type:
-        d = by_trade_type[tt]; d["wr"] = round(d["wins"]/d["total"]*100,1) if d["total"] else 0
-
-    win_pts  = [t.get("pnl_pts",0) or 0 for t in wins]
-    loss_pts = [t.get("pnl_pts",0) or 0 for t in losses]
-    return {
-        "total": len(closed), "wins": len(wins), "losses": len(losses),
-        "win_rate":     round(len(wins)/len(closed)*100,1),
-        "total_pnl_usd":round(sum(pnl_pts)*MNQ_PTS_TO_USD,2),
-        "avg_win_pts":  round(sum(win_pts)/len(win_pts),1) if win_pts else 0,
-        "avg_loss_pts": round(sum(loss_pts)/len(loss_pts),1) if loss_pts else 0,
-        "best_trade":   round(max(pnl_pts)*MNQ_PTS_TO_USD,2) if pnl_pts else 0,
-        "worst_trade":  round(min(pnl_pts)*MNQ_PTS_TO_USD,2) if pnl_pts else 0,
-        "by_session": by_session, "by_score": by_score,
-        "by_trade_type": by_trade_type,
-    }
-
-# ── Auto AI Retraining ────────────────────────────────────────────────────────
-def retrain_model_async(closed_trade):
-    def _retrain():
-        global model, state
-        with retrain_lock:
-            try:
-                trades = load_trades()
-                closed = [t for t in trades if t.get("result") in ("win","loss")]
-                if len(closed) < 5:
-                    print(f"⏭️  Skipping retrain — need ≥5 closed trades (have {len(closed)})")
-                    return
-                print(f"🧠 Retraining on {len(closed)} trades...")
-                rows = []
-                for t in closed:
-                    rows.append({
-                        "timeframe": "1H", "rsi_at_entry": t.get("rsi_at_entry", 50.0),
-                        "ema_diff": t.get("ema_diff", 0.0), "volume_ratio": t.get("volume_ratio", 1.0),
-                        "session": t.get("session", "newyork"), "htf_bias": t.get("htf_bias", "bullish"),
-                        "trade_direction": t.get("direction", "long"),
-                        "sl_distance_points": abs(t.get("sl",0) - t.get("entry",0)),
-                        "entry_price": t.get("entry", 0),
-                        "result": 1 if t["result"]=="win" else 0,
-                    })
-                df = pd.DataFrame(rows)
-                new_les = {}
-                for col in ["timeframe","session","htf_bias","trade_direction"]:
-                    le = LabelEncoder()
-                    old_classes = list(les[col].classes_) if col in les else []
-                    all_vals = list(set(old_classes + df[col].astype(str).tolist()))
-                    le.fit(all_vals); new_les[col] = le
-                new_les["rsi_zone"] = les["rsi_zone"]
-                new_les["vol_tier"] = les["vol_tier"]
-                X_rows = []; y = []
-                for _, row in df.iterrows():
-                    raw = row.to_dict()
-                    try:
-                        orig_les = les.copy(); les.update(new_les)
-                        feat = engineer({
-                            "timeframe": raw["timeframe"], "rsi_at_entry": raw["rsi_at_entry"],
-                            "ema_diff": raw["ema_diff"], "volume_ratio": raw["volume_ratio"],
-                            "session": raw["session"], "htf_bias": raw["htf_bias"],
-                            "trade_direction": raw["trade_direction"],
-                            "sl_distance_points": raw["sl_distance_points"],
-                            "entry_price": raw["entry_price"],
-                        })
-                        les.update(orig_les)
-                        X_rows.append(feat.values[0]); y.append(raw["result"])
-                    except Exception as e:
-                        print(f"  Skipping row: {e}")
-                if len(X_rows) < 5: return
-                X = np.array(X_rows); y = np.array(y)
-                new_model = RandomForestClassifier(n_estimators=200, max_depth=6,
-                    min_samples_leaf=2, random_state=42, class_weight="balanced")
-                new_model.fit(X, y)
-                joblib.dump({"model": new_model, "label_encoders": les, "feature_cols": FCOLS}, "model.pkl")
-                model = new_model
-                state["model_version"] += 1
-                state["last_retrain"]   = et_str()
-                print(f"✅ Retrain complete — v{state['model_version']} | {len(X)} samples")
-            except Exception as e:
-                import traceback; print(f"❌ Retrain failed: {e}\n{traceback.format_exc()}")
-    threading.Thread(target=_retrain, daemon=True).start()
-
-# ── Close trade ───────────────────────────────────────────────────────────────
-def _close_active(result, at, price):
+def _close_trade(result, at, exit_price):
     at["result"]     = result
-    at["exit_time"]  = et_str()
-    at["exit_price"] = round(price, 2)
-    at["pnl_pts"]    = round(abs(at["tp"]-at["entry"]),1) if result=="win" else round(-abs(at["sl"]-at["entry"]),1)
-    at["pnl_usd"]    = round(at["pnl_pts"] * MNQ_PTS_TO_USD, 2)
-    trades = load_trades(); trades.append(at); save_trades(trades)
-    threading.Thread(target=push_data_to_github, daemon=True).start()
-    threading.Thread(target=learn_from_trade, args=(at,), daemon=True).start()
+    at["exit_price"] = round(exit_price, 2)
+    at["exit_time"]  = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    pnl_pts = round(abs(at["tp"] - at["entry"]) if result == "win" else -abs(at["sl"] - at["entry"]), 1)
+    at["pnl_pts"] = pnl_pts
+    at["pnl_usd"] = round(pnl_pts * PNL_PER_PT, 2)
+
+    save_trade(at)
     state["active_trade"] = None
-    state["last_trade_close_time"] = __import__("time").time()
-    print(f"🏁 {result.upper()} {at['pnl_pts']:+.1f}pts (${at['pnl_usd']:+.2f}) [{at.get('trade_type','—')}]")
-    retrain_model_async(at)
 
-# ── Main loop ─────────────────────────────────────────────────────────────────
-def fetch_and_score():
-    global state, prev_score, last_fetch
-    now = time.time()
-    if now - last_fetch < INTERVAL: return
-    last_fetch = now
+    total, wins, losses, wr, total_pnl = get_stats()
+    state.update({
+        "total_trades": total, "wins": wins, "losses": losses,
+        "win_rate": wr, "capital": round(CAPITAL + total_pnl, 2),
+        "pnl": round(total_pnl, 2),
+    })
 
-    try:
-        # Fetch all timeframes
-        all_bars = fetch_all_timeframes()
-        bars_5m  = all_bars.get("5m")
+    emoji = "✅" if result == "win" else "❌"
+    log.info(f"{emoji} CLOSED {result.upper()} | PnL: ${at['pnl_usd']:+.0f} ({pnl_pts:+.1f}pts) | "
+             f"Bars: — | Capital: ${state['capital']} | WR: {wr}% ({wins}W/{losses}L)")
 
-        if bars_5m is None or len(bars_5m) < 10:
-            state["error"] = "No bar data — market may be closed"; return
+# ── Main signal logic ─────────────────────────────────────────────────────────
+def run_signal(df):
+    global last_trade_bar, daily_counts
 
-        # Compute indicators on 5m
-        bars_5m["ema9"]      = calc_ema(bars_5m["Close"], 9)
-        bars_5m["ema21"]     = calc_ema(bars_5m["Close"], 21)
-        bars_5m["rsi"]       = calc_rsi(bars_5m["Close"], 14)
-        bars_5m["vol_ma"]    = bars_5m["Volume"].rolling(20).mean()
-        bars_5m["atr"]       = calc_atr(bars_5m["High"], bars_5m["Low"], bars_5m["Close"], 14)
-        bars_5m["ema_diff"]  = bars_5m["ema9"] - bars_5m["ema21"]
-        bars_5m["vol_ratio"] = bars_5m["Volume"] / bars_5m["vol_ma"].replace(0, np.nan)
+    if state.get("trading_paused"):
+        return
 
-        last      = bars_5m.iloc[-1]
-        price     = float(last["Close"])
-        cur_high  = float(last["High"])
-        cur_low   = float(last["Low"])
-        rsi_val   = float(last["rsi"])
-        ema_diff  = float(last["ema_diff"])
-        vol_ratio = float(last["vol_ratio"]) if not np.isnan(last["vol_ratio"]) else 1.0
-        atr_val   = float(last["atr"])       if not np.isnan(last["atr"])       else 10.0
-        session   = get_kill_zone()[0]
-        htf_bias  = "bullish" if ema_diff > 0 else "bearish"
-        sl_dist   = round(max(20.0, min(40.0, atr_val * 0.7)), 1)  # tighter: 20-40 pts
+    i = len(df) - 1
+    bar = df.iloc[-1]
+    bt  = df.index[-1].to_pydatetime()
 
-        # Monitor active trade
-        at = state.get("active_trade")
-        if at and at["result"] == "open":
-            entry = at["entry"]
-            sl_gap = abs(entry - at["sl"])
+    # Session filter
+    session, active = get_session(bt)
+    state["session"] = session
+    if not active:
+        state["filters"] = {"session": False}
+        state["take"] = False
+        return
 
-            if at["direction"] == "long":
-                pnl_pts = price - entry
-                # Breakeven: move SL to entry+1 when +1R reached
-                if not at.get("breakeven") and pnl_pts >= sl_gap:
-                    at["sl"] = entry + 1.0
-                    at["breakeven"] = True
-                    print(f"🔒 Breakeven triggered — SL moved to {at['sl']}")
-                if cur_high >= at["tp"]:   _close_active("win",  at, price)
-                elif cur_low <= at["sl"]:  _close_active("loss", at, price)
-            else:
-                pnl_pts = entry - price
-                # Breakeven: move SL to entry-1 when +1R reached
-                if not at.get("breakeven") and pnl_pts >= sl_gap:
-                    at["sl"] = entry - 1.0
-                    at["breakeven"] = True
-                    print(f"🔒 Breakeven triggered — SL moved to {at['sl']}")
-                if cur_low  <= at["tp"]:   _close_active("win",  at, price)
-                elif cur_high >= at["sl"]: _close_active("loss", at, price)
+    # Daily cap
+    day = bt.strftime("%Y-%m-%d")
+    if daily_counts.get(day, 0) >= MAX_DAILY:
+        state["filters"] = {"daily_cap": False}
+        state["take"] = False
+        return
 
-            # Reversal exit: close in profit if HTF bias flips against trade
-            if at.get("result") == "open" and pnl_pts > 0:
-                expected_bias = "bullish" if at["direction"] == "long" else "bearish"
-                if htf_bias != expected_bias:
-                    print(f"🔄 Reversal detected — closing {at['direction']} at +{pnl_pts:.1f}pts")
-                    _close_active("reversal", at, price)
+    # Cooldown
+    if i - last_trade_bar < COOLDOWN:
+        state["filters"] = {"cooldown": False}
+        state["take"] = False
+        return
 
-        # ── Pure ICT scoring (replaces XGBoost) ────────────────────────────
-        kz_name, kz_active = get_kill_zone()
-        direction = "long" if ema_diff > 0 else "short"
+    sl = df.tail(50)
+    filters = {}
 
-        if direction == "long":
-            sl_price = round(price - sl_dist, 2)
-            tp_price = round(price + sl_dist * RR, 2)
+    # Filter 1: Volume spike
+    vol     = float(bar.get("volume", 0))
+    avg_vol = float(sl["volume"].tail(20).mean())
+    vol_ratio = round(vol / avg_vol, 2) if avg_vol > 0 else 0.0
+    filters["volume"] = vol_ratio >= VOL_MULT
+    state["vol_ratio"] = vol_ratio
+    if not filters["volume"]:
+        state["filters"] = filters
+        state["take"] = False
+        return
+
+    # Filter 2: HTF alignment
+    closes = list(df["close"])
+    if len(closes) < 600:
+        state["take"] = False
+        return
+    weekly, daily_bias, h4, h1 = get_mtf(closes)
+    filters["htf_aligned"] = (weekly == daily_bias == h4)
+    state["htf"] = f"{weekly}/{daily_bias}/{h4}/{h1}"
+    if not filters["htf_aligned"]:
+        state["filters"] = filters
+        state["take"] = False
+        return
+
+    direction = "long" if h4 == "bull" else "short"
+
+    # Filter 3: 1H momentum
+    filters["momentum"] = (direction == "long" and h1 == "bull") or (direction == "short" and h1 == "bear")
+    if not filters["momentum"]:
+        state["filters"] = filters
+        state["take"] = False
+        return
+
+    # Filter 4: RSI
+    rsi = calc_rsi(sl["close"])
+    filters["rsi"] = not (direction == "long" and rsi > 65) and not (direction == "short" and rsi < 35)
+    state["rsi"] = round(rsi, 1)
+    if not filters["rsi"]:
+        state["filters"] = filters
+        state["take"] = False
+        return
+
+    # Filter 5: FVG or OB
+    close = float(bar["close"])
+    fvg_lo, fvg_hi = find_fvg(sl, direction)
+    ob_lo,  ob_hi  = find_ob(sl, direction)
+    at_fvg = fvg_lo is not None and fvg_lo <= close <= fvg_hi
+    at_ob  = ob_lo  is not None and ob_lo  <= close <= ob_hi
+    filters["fvg_or_ob"] = at_fvg or at_ob
+    if not filters["fvg_or_ob"]:
+        state["filters"] = filters
+        state["take"] = False
+        return
+
+    # ALL FILTERS PASSED
+    filters["all_pass"] = True
+    state["filters"] = filters
+
+    atr     = float((df.tail(20)["high"] - df.tail(20)["low"]).mean())
+    sl_dist = max(20.0, min(50.0, atr))
+
+    if direction == "long":
+        sl_price = round(close - sl_dist, 2)
+        tp_price = round(close + sl_dist * RR, 2)
+    else:
+        sl_price = round(close + sl_dist, 2)
+        tp_price = round(close - sl_dist * RR, 2)
+
+    state.update({
+        "price": round(close, 2),
+        "direction": direction.upper(),
+        "sl_price": sl_price,
+        "tp_price": tp_price,
+        "take": True,
+    })
+
+    # Only enter if no active trade
+    if not state.get("active_trade"):
+        trade = {
+            "time":      bt.strftime("%Y-%m-%d %H:%M:%S"),
+            "session":   session,
+            "direction": direction,
+            "entry":     round(close, 2),
+            "sl":        sl_price,
+            "tp":        tp_price,
+            "sl_dist":   round(sl_dist, 1),
+            "vol_ratio": vol_ratio,
+            "rsi":       round(rsi, 1),
+            "at_fvg":    at_fvg,
+            "at_ob":     at_ob,
+            "htf":       f"{weekly}/{daily_bias}/{h4}/{h1}",
+            "result":    "open",
+            "exit_price": None,
+            "exit_time":  None,
+            "pnl_pts":    None,
+            "pnl_usd":    None,
+        }
+        state["active_trade"] = trade
+        last_trade_bar = i
+        daily_counts[day] = daily_counts.get(day, 0) + 1
+
+        emoji = "📈" if direction == "long" else "📉"
+        log.info(f"{emoji} PAPER {direction.upper()} @ {close:.2f} | "
+                 f"SL: {sl_price} TP: {tp_price} | Session: {session} | "
+                 f"Vol: {vol_ratio:.2f}x RSI: {rsi:.1f} HTF: {weekly}/{daily_bias}/{h4}/{h1}")
+
+# ── Background loop ───────────────────────────────────────────────────────────
+def trading_loop():
+    log.info("🚀 ICT Strict Filter Bot v2 started")
+    # Load persisted stats on startup
+    total, wins, losses, wr, total_pnl = get_stats()
+    state.update({
+        "total_trades": total, "wins": wins, "losses": losses,
+        "win_rate": wr, "capital": round(CAPITAL + total_pnl, 2),
+        "pnl": round(total_pnl, 2),
+    })
+    log.info(f"📊 Loaded {total} historical trades | WR: {wr}% | Capital: ${state['capital']}")
+
+    bar_count = 0
+    while True:
+        try:
+            log.info("📥 Fetching latest bars...")
+            df = fetch_bars()
+            if df is None:
+                log.info("⏸️  No new bars — waiting 15s")
+                time.sleep(INTERVAL)
+                continue
+
+            bar_count += 1
+            log.info(f"📊 {bar_count} new bar(s) received")
+
+            with _lock:
+                check_active_trade(df)
+                if not state.get("active_trade"):
+                    run_signal(df)
+
+                state["price"]       = round(float(df.iloc[-1]["close"]), 2)
+                state["last_update"] = datetime.now(timezone.utc).strftime("%H:%M:%S")
+                state["error"]       = None
+
+            # Status log
+            at = state.get("active_trade")
+            pos = f"{at['direction'].upper()} @ {at['entry']}" if at else "FLAT"
+            log.info(f"Bar {bar_count} | Pos: {pos} | Capital: ${state['capital']} | "
+                     f"WR: {state['win_rate']}% | Trades: {state['total_trades']}")
+
+        except Exception as e:
+            import traceback
+            state["error"] = str(e)
+            log.error(f"Error: {e}")
+            log.error(traceback.format_exc())
+
+        time.sleep(INTERVAL)
+
+# ── Flask routes ──────────────────────────────────────────────────────────────
+@app.route("/")
+def dashboard():
+    with _lock:
+        s = dict(state)
+    at = s.get("active_trade")
+    trades = load_trades()
+    closed = [t for t in trades if t["result"] in ("win", "loss")][-20:]  # last 20
+
+    rows = ""
+    for t in reversed(closed):
+        color = "#00e5a0" if t["result"] == "win" else "#ff4d6d"
+        pnl = t.get("pnl_usd", 0) or 0
+        rows += f"""<tr>
+            <td>{t['time'][:16]}</td>
+            <td>{t['direction'].upper()}</td>
+            <td>{t['session']}</td>
+            <td>{t['entry']}</td>
+            <td>{t.get('exit_price','—')}</td>
+            <td style="color:{color}">${pnl:+.0f}</td>
+            <td style="color:{color}">{t['result'].upper()}</td>
+        </tr>"""
+
+    filters = s.get("filters", {})
+    filter_html = ""
+    filter_map = {
+        "session": "Session kill zone",
+        "volume": f"Volume ≥1.5x ({s['vol_ratio']:.2f}x)",
+        "htf_aligned": f"HTF aligned ({s['htf']})",
+        "momentum": "1H momentum",
+        "rsi": f"RSI 35–65 ({s['rsi']:.1f})",
+        "fvg_or_ob": "FVG or OB",
+    }
+    for k, label in filter_map.items():
+        val = filters.get(k)
+        if val is True:
+            dot = "🟢"
+        elif val is False:
+            dot = "🔴"
         else:
-            sl_price = round(price + sl_dist, 2)
-            tp_price = round(price - sl_dist * RR, 2)
+            dot = "⚪"
+        filter_html += f"<div class='frow'><span>{dot}</span><span>{label}</span></div>"
 
-        # Run ICT analysis (multi-timeframe structure)
-        ict_addon, ict_factors, trade_type, mtf = run_ict_analysis(all_bars, direction, price)
+    active_html = ""
+    if at and at["result"] == "open":
+        active_html = f"""
+        <div class='active-trade'>
+            <div class='at-title'>⚡ OPEN TRADE</div>
+            <div class='at-grid'>
+                <span>Dir: <b>{at['direction'].upper()}</b></span>
+                <span>Entry: <b>{at['entry']}</b></span>
+                <span>SL: <b style="color:#ff4d6d">{at['sl']}</b></span>
+                <span>TP: <b style="color:#00e5a0">{at['tp']}</b></span>
+            </div>
+        </div>"""
 
-        # Run pure ICT score (7 binary conditions)
-        bars_5m_renamed = bars_5m.rename(columns={c: c.lower() for c in bars_5m.columns})
-        ict_s, ict_conds = ict_score(bars_5m_renamed, direction, mtf, kz_active)
-
-        final_score = round(ict_s / 7 * 100)
-
-        # Take trade if score >= 5/7 AND kill zone active
-        ICT_THRESHOLD = 5  # raised back to quality threshold
-        # Quality filters
-        htf_ok = ict_conds.get("htf_aligned", False)
-        has_setup = (trade_type != "no_setup")
-        
-        # Cooldown — 30 min after last trade
-        import time as _time
-        last_trade_time = state.get("last_trade_close_time", 0)
-        cooldown_ok = (_time.time() - last_trade_time) > 1800  # 30 min
-        
-        # Daily limit — max 5 trades per day
-        from datetime import datetime as _dt
-        today = _dt.now().strftime("%Y-%m-%d")
-        _all_trades = load_trades()
-        daily_trades = sum(1 for t in _all_trades if t.get("time","")[:10] == today)
-        daily_ok = daily_trades < 5
-        
-        alert = (ict_s >= ICT_THRESHOLD) and kz_active and not state.get("active_trade") and htf_ok and has_setup and cooldown_ok and daily_ok
-        alert_msg = ""
-
-        # ── Pause check ─────────────────────────────────────────────────────
-        if state.get("trading_paused"):
-            pu = state.get("pause_until")
-            if pu and time.time() > pu:
-                state["trading_paused"] = False
-                state["pause_until"] = None
-                print("▶️  Auto-resume after countdown")
-            else:
-                state["last_update"] = et_str()
-                return
-
-        if alert:
-            # ── AI filter ────────────────────────────────────────────────────
-            ai_ok, ai_reason = ai_trade_filter(
-                direction=state.get("direction", ""),
-                price=price,
-                score=final_score,
-                long_score=final_score if direction == "long" else 0,
-                short_score=final_score if direction == "short" else 0,
-                weekly=mtf.get("weekly","?"),
-                daily=mtf.get("daily","?"),
-                h4=mtf.get("4h","?"),
-                h1=mtf.get("1h","?"),
-                m15=mtf.get("15m","?"),
-                ict_factors=state.get("ict_factors", []),
-                atr_val=state.get("atr", 20.0)
-            )
-            state["ai_reason"] = ai_reason
-            if not ai_ok:
-                print(f"🤖 AI rejected trade: {ai_reason}")
-                alert = False
-
-        if alert and not state.get("active_trade"):
-            new_trade = {
-                "time": et_str("%Y-%m-%d %H:%M:%S"),
-                "direction": direction, "entry": price,
-                "sl": sl_price, "tp": tp_price,
-                "score": final_score, "ict_raw": ict_s, "ict_conditions": ict_conds,
-                "session": session, "htf_bias": htf_bias,
-                "rsi_at_entry": round(rsi_val,1), "ema_diff": round(ema_diff,1),
-                "volume_ratio": round(vol_ratio,2),
-                "trade_type": trade_type,
-                "result": "open", "exit_price": None,
-                "exit_time": None, "pnl_pts": None, "pnl_usd": None,
-            }
-            state["active_trade"] = new_trade
-            alert_msg = f"AUTO [{trade_type.upper()}]: {direction.upper()} @ {price:,.1f} | ICT:{ict_s}/7 ({final_score}%)"
-            print(f"🤖 {alert_msg}")
-
-        prev_score = final_score
-        trades = load_trades()
-        stats  = calc_stats(trades)
-
-        state.update({
-            "score": final_score, "base_score": final_score, "ict_score": ict_s,
-            "ict_conditions": ict_conds, "direction": direction.upper(),
-            "rsi": round(rsi_val,1), "ema_diff": round(ema_diff,1),
-            "vol_ratio": round(vol_ratio,2), "session": session,
-            "htf_bias": htf_bias, "sl_dist": sl_dist,
-            "price": round(price,2), "sl_price": sl_price, "tp_price": tp_price,
-            "last_update": et_str(),
-            "error": None, "ict_factors": ict_factors, "trade_type": trade_type,
-            "alert": alert, "alert_msg": alert_msg,
-            "total_trades": stats["total"], "wins": stats["wins"],
-            "losses": stats["losses"], "win_rate": stats["win_rate"],
-            "total_pnl_usd": stats["total_pnl_usd"],
-            "trades": trades, "stats": stats, "mtf": mtf,
-        })
-
-        print(f"[v8-ICT] {direction.upper()} ict={ict_s}/7 ({final_score}%) type={trade_type} price={price}")
-
-    except Exception as e:
-        import traceback
-        state["error"] = str(e)
-        state["last_update"] = et_str()
-        print(f"Error: {e}\n{traceback.format_exc()}")
-
-# ── HTML ──────────────────────────────────────────────────────────────────────
-HTML = """<!DOCTYPE html>
-<html><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>IFVG Live AI v7</title>
+    return render_template_string(f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ICT Bot v2</title>
+<meta http-equiv="refresh" content="15">
 <style>
-:root{--bg:#f8f9fa;--surface:#ffffff;--border:#e2e8f0;--text:#1a202c;--muted:#718096;--green:#00a67e;--red:#e53e3e;--amber:#d97706;--blue:#2b6cb0;--purple:#6b46c1}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;padding:16px}
-.wrap{max-width:520px;margin:0 auto}
-.logo{font-size:10px;color:var(--muted);letter-spacing:3px;margin-bottom:6px;font-family:'Courier New',monospace}
-h1{font-size:22px;font-weight:800;margin-bottom:4px}
-h1 span{color:var(--green)}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;animation:pulse 1.5s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
-.meta-row{display:flex;gap:6px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
-.meta-badge{font-size:10px;padding:3px 8px;border-radius:4px;font-family:'Courier New',monospace}
-.badge-src{background:rgba(77,159,255,.15);color:var(--blue);border:1px solid rgba(77,159,255,.3)}
-.badge-model{background:rgba(0,229,160,.1);color:var(--green);border:1px solid rgba(0,229,160,.3)}
-.badge-type{background:rgba(176,111,255,.15);color:var(--purple);border:1px solid rgba(176,111,255,.3)}
-.badge-retrain{background:rgba(255,182,39,.1);color:var(--amber);border:1px solid rgba(255,182,39,.3)}
-.verdict{border-radius:14px;padding:20px;text-align:center;margin-bottom:14px;transition:all 0.4s}
-.verdict.take{background:rgba(0,229,160,.08);border:2px solid rgba(0,229,160,.4)}
-.verdict.skip{background:rgba(255,77,109,.08);border:2px solid rgba(255,77,109,.3)}
-.verdict.loading{background:rgba(255,255,255,.03);border:2px solid var(--border)}
-.v-label{font-size:10px;color:var(--muted);letter-spacing:2px;font-family:'Courier New',monospace;margin-bottom:6px}
-.v-text{font-size:34px;font-weight:800}
-.verdict.take .v-text{color:var(--green)}.verdict.skip .v-text{color:var(--red)}.verdict.loading .v-text{color:var(--muted)}
-.v-dir{font-size:11px;color:var(--muted);margin-top:3px;font-family:'Courier New',monospace}
-.score-breakdown{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:10px 0 0}
-.score-box{background:var(--bg);border-radius:6px;padding:7px;text-align:center}
-.score-lbl{font-size:9px;color:var(--muted);font-family:'Courier New',monospace;margin-bottom:2px}
-.score-val{font-size:16px;font-weight:800}
-.bar-wrap{margin:10px 0 2px}
-.bar-label{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);font-family:'Courier New',monospace;margin-bottom:5px}
-.bar-track{height:6px;background:var(--border);border-radius:99px;overflow:hidden}
-.bar-fill{height:100%;border-radius:99px;transition:width .8s cubic-bezier(.4,0,.2,1),background .4s}
-.dual{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
-.dual-card{border-radius:12px;padding:12px;text-align:center;background:var(--surface);border:1px solid var(--border);transition:border .3s}
-.dual-lbl{font-size:9px;color:var(--muted);letter-spacing:2px;font-family:'Courier New',monospace;margin-bottom:5px}
-.dual-val{font-size:22px;font-weight:800}
-.dual-sub{font-size:10px;color:var(--muted);margin-top:2px}
-.sltp{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
-.sl-box{border-radius:10px;padding:12px;text-align:center;background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.3)}
-.tp-box{border-radius:10px;padding:12px;text-align:center;background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.3)}
-.sltp-lbl{font-size:9px;font-family:'Courier New',monospace;letter-spacing:2px;margin-bottom:3px}
-.sl-box .sltp-lbl{color:var(--red)}.tp-box .sltp-lbl{color:var(--green)}
-.sltp-price{font-size:17px;font-weight:800}
-.sl-box .sltp-price{color:var(--red)}.tp-box .sltp-price{color:var(--green)}
-.sltp-dist{font-size:10px;color:var(--muted);margin-top:2px}
-.mtf-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:12px}
-.mtf-cell{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 4px;text-align:center}
-.mtf-tf{font-size:8px;color:var(--muted);font-family:'Courier New',monospace;margin-bottom:2px}
-.mtf-val{font-size:10px;font-weight:700}
-.mtf-bull{color:var(--green)}.mtf-bear{color:var(--red)}.mtf-range{color:var(--amber)}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px}
-.card-title{font-size:9px;color:var(--muted);letter-spacing:2px;font-family:'Courier New',monospace;margin-bottom:10px}
-.metrics{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-.metric{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 11px}
-.m-lbl{font-size:9px;color:var(--muted);letter-spacing:1px;font-family:'Courier New',monospace;margin-bottom:3px}
-.m-val{font-size:14px;font-weight:700}
-.green{color:var(--green)}.red{color:var(--red)}.amber{color:var(--amber)}.blue{color:var(--blue)}.purple{color:var(--purple)}
-.factors{display:flex;flex-direction:column;gap:6px}
-.factor{display:flex;justify-content:space-between;align-items:center;padding:8px 11px;border-radius:8px;background:var(--bg);border:1px solid var(--border)}
-.f-left{display:flex;align-items:center;gap:8px}
-.f-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-.f-name{font-size:11px;color:var(--muted);font-family:'Courier New',monospace}
-.f-val{font-size:11px}
-.good .f-dot{background:var(--green)}.good .f-val{color:var(--green)}
-.neutral .f-dot{background:var(--amber)}.neutral .f-val{color:var(--amber)}
-.bad .f-dot{background:var(--red)}.bad .f-val{color:var(--red)}
-.ict-factor{display:flex;justify-content:space-between;align-items:center;padding:7px 11px;border-radius:7px;background:var(--bg);border:1px solid var(--border);margin-bottom:5px}
-.ict-left{display:flex;align-items:center;gap:7px}
-.ict-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
-.ict-aligned .ict-dot{background:var(--green)}.ict-misaligned .ict-dot{background:var(--red)}
-.ict-name{font-size:10px;color:var(--muted);font-family:'Courier New',monospace}
-.ict-val{font-size:10px;font-weight:700}
-.ict-aligned .ict-val{color:var(--green)}.ict-misaligned .ict-val{color:var(--red)}
-.ict-detail{font-size:9px;color:var(--muted);margin-top:2px;font-family:'Courier New',monospace}
-.at-card{border-radius:14px;padding:18px;margin-bottom:12px;background:rgba(255,182,39,.08);border:2px solid rgba(255,182,39,.4);display:none}
-.at-title{font-size:10px;color:var(--amber);letter-spacing:2px;font-family:'Courier New',monospace;margin-bottom:10px}
-.at-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.at-cell{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px;text-align:center}
-.at-lbl{font-size:9px;color:var(--muted);font-family:'Courier New',monospace;margin-bottom:3px}
-.at-val{font-size:16px;font-weight:800}
-.at-pnl{margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px}
-.at-btns{display:flex;gap:8px;margin-top:8px}
-.btn-win{flex:1;padding:9px;border-radius:8px;border:none;background:rgba(0,229,160,.2);color:var(--green);font-weight:700;cursor:pointer;font-size:12px}
-.btn-loss{flex:1;padding:9px;border-radius:8px;border:none;background:rgba(255,77,109,.2);color:var(--red);font-weight:700;cursor:pointer;font-size:12px}
-.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:10px}
-.stat{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px;text-align:center}
-.stat-val{font-size:18px;font-weight:800}
-.stat-lbl{font-size:9px;color:var(--muted);font-family:'Courier New',monospace;margin-top:2px}
-.pnl-big{text-align:center;padding:12px;border-radius:10px;margin-bottom:10px}
-.pnl-big.pos{background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.3)}
-.pnl-big.neg{background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.3)}
-.pnl-label{font-size:10px;color:var(--muted);letter-spacing:2px;font-family:'Courier New',monospace;margin-bottom:3px}
-.pnl-val{font-size:26px;font-weight:800}
-.breakdown-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:11px}
-.breakdown-row:last-child{border-bottom:none}
-.breakdown-label{color:var(--muted);font-family:'Courier New',monospace}
-.mini-bar{height:3px;border-radius:2px;background:var(--border);margin-top:3px;overflow:hidden}
-.mini-bar-fill{height:100%;border-radius:2px;background:var(--green)}
-.tlog-wrap{overflow-x:auto}
-.tlog{width:100%;border-collapse:collapse;font-size:10px;font-family:'Courier New',monospace}
-.tlog th{font-size:8px;color:var(--muted);letter-spacing:1px;padding:5px 6px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
-.tlog td{padding:7px 6px;border-bottom:1px solid rgba(30,34,41,.6);white-space:nowrap}
-.tlog tr:hover td{background:rgba(255,255,255,.02)}
-.badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700}
-.badge-win{background:rgba(0,229,160,.15);color:var(--green);border:1px solid rgba(0,229,160,.3)}
-.badge-loss{background:rgba(255,77,109,.15);color:var(--red);border:1px solid rgba(255,77,109,.3)}
-.badge-open{background:rgba(255,182,39,.15);color:var(--amber);border:1px solid rgba(255,182,39,.3)}
-.badge-cont{background:rgba(0,229,160,.1);color:var(--green);border:1px solid rgba(0,229,160,.2);font-size:8px}
-.badge-rev{background:rgba(176,111,255,.1);color:var(--purple);border:1px solid rgba(176,111,255,.2);font-size:8px}
-.dir-long{color:var(--green)}.dir-short{color:var(--red)}
-.empty-log{color:var(--muted);font-size:11px;padding:14px 0;text-align:center}
-.alert-banner{background:rgba(0,229,160,.15);border:1px solid var(--green);border-radius:10px;padding:12px;margin-bottom:12px;font-size:12px;font-weight:700;color:var(--green);text-align:center;display:none}
-.error-box{background:rgba(255,77,109,.1);border:1px solid var(--red);border-radius:10px;padding:10px;font-size:11px;color:var(--red);margin-bottom:10px;display:none}
-.update-row{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);font-family:'Courier New',monospace;margin-top:4px}
-.tabs{display:flex;gap:2px;margin-bottom:12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:3px}
-.tab-btn{flex:1;padding:7px;border-radius:7px;border:none;background:transparent;color:var(--muted);font-size:10px;font-family:'Courier New',monospace;letter-spacing:1px;cursor:pointer;transition:all .2s}
-.tab-btn.active{background:var(--bg);color:var(--text);font-weight:700}
-.tab-pane{display:none}.tab-pane.active{display:block}
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{background:#0a0c0f;color:#e8eaf0;font-family:-apple-system,sans-serif;padding:16px}}
+.wrap{{max-width:600px;margin:0 auto}}
+h1{{font-size:20px;font-weight:700;margin-bottom:16px;color:#00e5a0}}
+.grid{{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px}}
+.card{{background:#111318;border:1px solid #1e2229;border-radius:10px;padding:14px;text-align:center}}
+.lbl{{font-size:10px;color:#5a6070;margin-bottom:4px;letter-spacing:1px}}
+.val{{font-size:22px;font-weight:700}}
+.green{{color:#00e5a0}}.red{{color:#ff4d6d}}.amber{{color:#ffb627}}
+.filters{{background:#111318;border:1px solid #1e2229;border-radius:10px;padding:14px;margin-bottom:16px}}
+.ftitle{{font-size:11px;color:#5a6070;letter-spacing:2px;margin-bottom:10px}}
+.frow{{display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0}}
+.active-trade{{background:rgba(255,182,39,.1);border:1px solid rgba(255,182,39,.4);border-radius:10px;padding:14px;margin-bottom:16px}}
+.at-title{{font-size:11px;color:#ffb627;letter-spacing:2px;margin-bottom:8px}}
+.at-grid{{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:13px}}
+table{{width:100%;border-collapse:collapse;font-size:12px;background:#111318;border-radius:10px;overflow:hidden}}
+th{{background:#1e2229;padding:8px;text-align:left;color:#5a6070;font-weight:500}}
+td{{padding:8px;border-bottom:1px solid #1e2229}}
+.error{{background:rgba(255,77,109,.1);border:1px solid #ff4d6d;border-radius:8px;padding:10px;color:#ff4d6d;margin-bottom:12px;font-size:12px}}
 </style></head>
 <body><div class="wrap">
-
-<div class="logo">NQ / MNQ FUTURES — ICT FRAMEWORK</div>
-<h1><span class="dot"></span>IFVG <span>Live AI v7</span></h1>
-<div class="meta-row">
-  <span class="meta-badge badge-src" id="src-badge">MTF ACTIVE</span>
-  <span class="meta-badge badge-model" id="model-badge">MODEL v0</span>
-  <span class="meta-badge badge-type" id="type-badge">—</span>
-  <span class="meta-badge badge-retrain" id="retrain-badge">AWAITING TRADES</span>
+<h1>⚡ ICT Strict Filter Bot v2</h1>
+{"<div class='error'>⚠️ "+s['error']+"</div>" if s.get('error') else ""}
+<div class="grid">
+    <div class="card"><div class="lbl">CAPITAL</div><div class="val {'green' if s['pnl']>=0 else 'red'}">${s['capital']:,.0f}</div></div>
+    <div class="card"><div class="lbl">WIN RATE</div><div class="val amber">{s['win_rate']}%</div></div>
+    <div class="card"><div class="lbl">TRADES</div><div class="val">{s['total_trades']}</div></div>
+    <div class="card"><div class="lbl">P&L</div><div class="val {'green' if s['pnl']>=0 else 'red'}">${s['pnl']:+,.0f}</div></div>
+    <div class="card"><div class="lbl">WINS/LOSSES</div><div class="val">{s['wins']}W / {s['losses']}L</div></div>
+    <div class="card"><div class="lbl">PRICE</div><div class="val">{s['price']:,.1f}</div></div>
 </div>
-
-<div class="alert-banner" id="ab"></div>
-<div class="error-box" id="eb"></div>
-
-<!-- Verdict -->
-<div class="verdict loading" id="verdict">
-  <div class="v-label">AI RECOMMENDATION</div>
-  <div class="v-text" id="vt">LOADING...</div>
-  <div class="v-dir" id="vd">Fetching MTF data...</div>
-  <div class="score-breakdown">
-    <div class="score-box"><div class="score-lbl">ICT SCORE</div><div class="score-val blue" id="base-score">0/7</div></div>
-    <div class="score-box" style="display:none"><div id="ict-score">0</div></div>
-    <div class="score-box"><div class="score-lbl">FINAL</div><div class="score-val" id="final-score">—</div></div>
-  </div>
-  <div class="bar-wrap">
-    <div class="bar-label"><span>ICT CONFIDENCE</span><span id="bp">—</span></div>
-    <div class="bar-track"><div class="bar-fill" id="bf" style="width:0%;background:var(--muted)"></div></div>
-  </div>
+{active_html}
+<div class="filters">
+    <div class="ftitle">FILTER STATUS — {s['session'].upper()} — {s['last_update']}</div>
+    {filter_html}
 </div>
-
-<!-- ICT Conditions -->
-<div style="padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin:0 0 10px">
-  <div style="font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:6px">ICT CONDITIONS</div>
-  <div id="cond-grid" style="display:flex;flex-wrap:wrap;gap:4px">
-    <span style="color:var(--muted);font-size:11px">Loading...</span>
-  </div>
+<table>
+    <tr><th>Time</th><th>Dir</th><th>Session</th><th>Entry</th><th>Exit</th><th>P&L</th><th>Result</th></tr>
+    {rows if rows else "<tr><td colspan='7' style='text-align:center;color:#5a6070;padding:20px'>No closed trades yet</td></tr>"}
+</table>
+<div style="font-size:10px;color:#5a6070;margin-top:10px;text-align:center">
+    Auto-refresh 15s · ICT Strict v2 · RR:{RR} Vol:{VOL_MULT}x MaxDaily:{MAX_DAILY}
 </div>
+</div></body></html>""")
 
-<!-- SL/TP -->
-<div class="sltp">
-  <div class="sl-box"><div class="sltp-lbl">STOP LOSS</div><div class="sltp-price" id="sl-p">—</div><div class="sltp-dist" id="sl-d">—</div></div>
-  <div class="tp-box"><div class="sltp-lbl">TAKE PROFIT</div><div class="sltp-price" id="tp-p">—</div><div class="sltp-dist" id="tp-d">—</div></div>
-</div>
-
-<!-- MTF Structure -->
-<div class="mtf-grid" id="mtf-grid">
-  <div class="mtf-cell"><div class="mtf-tf">WEEKLY</div><div class="mtf-val" id="mtf-w">—</div></div>
-  <div class="mtf-cell"><div class="mtf-tf">DAILY</div><div class="mtf-val" id="mtf-d">—</div></div>
-  <div class="mtf-cell"><div class="mtf-tf">4H</div><div class="mtf-val" id="mtf-4h">—</div></div>
-  <div class="mtf-cell"><div class="mtf-tf">1H</div><div class="mtf-val" id="mtf-1h">—</div></div>
-  <div class="mtf-cell"><div class="mtf-tf">15M</div><div class="mtf-val" id="mtf-15m">—</div></div>
-</div>
-
-<!-- Active Trade -->
-<div class="at-card" id="atcard">
-  <div class="at-title">🤖 AUTO PAPER TRADE</div>
-  <div class="at-grid">
-    <div class="at-cell"><div class="at-lbl">DIRECTION</div><div class="at-val" id="at-dir">—</div></div>
-    <div class="at-cell"><div class="at-lbl">ENTRY</div><div class="at-val blue" id="at-entry">—</div></div>
-    <div class="at-cell" style="background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.3)">
-      <div class="at-lbl" style="color:var(--red)">SL</div><div class="at-val red" id="at-sl">—</div>
-    </div>
-    <div class="at-cell" style="background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.3)">
-      <div class="at-lbl" style="color:var(--green)">TP</div><div class="at-val green" id="at-tp">—</div>
-    </div>
-  </div>
-  <div class="at-pnl"><div class="at-lbl">LIVE P&L (paper · 1 MNQ)</div><div class="at-val" id="at-pnl">—</div></div>
-  <div class="at-btns">
-    <button class="btn-win" onclick="closeTrade('win')">✅ Force WIN</button>
-    <button class="btn-loss" onclick="closeTrade('loss')">❌ Force LOSS</button>
-  </div>
-</div>
-
-<!-- Tabs -->
-<div class="tabs">
-  <button class="tab-btn active" onclick="showTab('metrics',this)">METRICS</button>
-  <button class="tab-btn" onclick="showTab('ict',this)">ICT ANALYSIS</button>
-  <button class="tab-btn" onclick="showTab('stats',this)">STATS</button>
-  <button class="tab-btn" onclick="showTab('log',this)">LOG</button>
-</div>
-
-<!-- METRICS TAB -->
-<div id="tab-metrics" class="tab-pane active">
-  <div class="card">
-    <div class="card-title">LIVE METRICS (5M)</div>
-    <div class="metrics">
-      <div class="metric"><div class="m-lbl">PRICE</div><div class="m-val blue" id="mp">—</div></div>
-      <div class="metric"><div class="m-lbl">RSI</div><div class="m-val" id="mr">—</div></div>
-      <div class="metric"><div class="m-lbl">EMA DIFF</div><div class="m-val" id="me">—</div></div>
-      <div class="metric"><div class="m-lbl">VOLUME</div><div class="m-val" id="mv">—</div></div>
-      <div class="metric"><div class="m-lbl">KILL ZONE</div><div class="m-val" id="ms">—</div></div>
-      <div class="metric"><div class="m-lbl">HTF BIAS</div><div class="m-val" id="mb">—</div></div>
-    </div>
-  </div>
-  <div class="card"><div class="card-title">MODEL FACTORS</div><div class="factors" id="factors"></div></div>
-</div>
-
-<!-- ICT TAB -->
-<div id="tab-ict" class="tab-pane">
-  <div class="card">
-    <div class="card-title">ICT ANALYSIS</div>
-    <div id="ict-factors-list"></div>
-  </div>
-  <div class="card">
-    <div class="card-title">MTF CONTEXT</div>
-    <div id="mtf-detail"></div>
-  </div>
-</div>
-
-<!-- STATS TAB -->
-<div id="tab-stats" class="tab-pane">
-  <div class="card">
-    <div class="card-title">PAPER PERFORMANCE</div>
-    <div class="pnl-big" id="pnl-big">
-      <div class="pnl-label">TOTAL P&L (1 MNQ)</div>
-      <div class="pnl-val" id="pnl-val">$0.00</div>
-    </div>
-    <div class="stats-grid">
-      <div class="stat"><div class="stat-val green" id="sw">0</div><div class="stat-lbl">WINS</div></div>
-      <div class="stat"><div class="stat-val red" id="sl2">0</div><div class="stat-lbl">LOSSES</div></div>
-      <div class="stat"><div class="stat-val" id="sr">—</div><div class="stat-lbl">WIN RATE</div></div>
-      <div class="stat"><div class="stat-val amber" id="sa-win">—</div><div class="stat-lbl">AVG WIN</div></div>
-      <div class="stat"><div class="stat-val red" id="sa-loss">—</div><div class="stat-lbl">AVG LOSS</div></div>
-      <div class="stat"><div class="stat-val blue" id="st-total">0</div><div class="stat-lbl">TOTAL</div></div>
-    </div>
-  </div>
-  <div class="card"><div class="card-title">BY TRADE TYPE</div><div id="type-breakdown"></div></div>
-  <div class="card"><div class="card-title">BY SESSION</div><div id="session-breakdown"></div></div>
-  <div class="card"><div class="card-title">BY SCORE</div><div id="score-breakdown"></div></div>
-</div>
-
-<!-- LOG TAB -->
-<div id="tab-log" class="tab-pane">
-  <div class="card">
-    <div class="card-title">ALL TRADES</div>
-    <div class="tlog-wrap">
-      <table class="tlog">
-        <thead><tr><th>TIME</th><th>TYPE</th><th>DIR</th><th>ENTRY</th><th>SCORE</th><th>SESSION</th><th>EXIT</th><th>PTS</th><th>USD</th><th>RESULT</th></tr></thead>
-        <tbody id="tlog-body"></tbody>
-      </table>
-      <div class="empty-log" id="tlog-empty">No trades logged yet</div>
-    </div>
-  </div>
-</div>
-
-<div class="update-row">
-  <span id="ut">Loading...</span>
-  <span id="pt" class="blue" style="font-weight:700">NQ1! MTF</span>
-</div>
-
-</div>
-<script>
-function showTab(name, btn) {
-  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('tab-'+name).classList.add('active');
-  btn.classList.add('active');
-}
-
-function structColor(s) {
-  if (!s) return 'var(--muted)';
-  if (s==='bullish') return 'var(--green)';
-  if (s==='bearish') return 'var(--red)';
-  return 'var(--amber)';
-}
-
-function structClass(s) {
-  if (s==='bullish') return 'mtf-bull';
-  if (s==='bearish') return 'mtf-bear';
-  return 'mtf-range';
-}
-
-async function refresh() {
-  try {
-    const d = await (await fetch('/state')).json();
-
-    const eb=document.getElementById('eb');
-    eb.style.display=d.error?'block':'none';
-    if(d.error)eb.textContent='⚠️ '+d.error;
-
-    const ab=document.getElementById('ab');
-    if(d.alert&&d.alert_msg){ab.style.display='block';ab.textContent='🤖 '+d.alert_msg;playAlert();setTimeout(()=>ab.style.display='none',15000);}
-
-    // Meta
-    document.getElementById('model-badge').textContent='MODEL v'+(d.model_version||0);
-    document.getElementById('type-badge').textContent=(d.trade_type||'—').toUpperCase().replace('_',' ');
-    document.getElementById('retrain-badge').textContent=d.last_retrain!=='—'?'RETRAINED '+d.last_retrain:'AWAITING TRADES';
-
-    // Verdict
-    document.getElementById('verdict').className='verdict '+(d.take?'take':'skip');
-    document.getElementById('vt').textContent=d.take?'✅ TAKE':'❌ SKIP';
-    document.getElementById('vd').textContent=d.direction+' · Final Score '+d.score+'%';
-    // ICT conditions display
-    const conds = d.ict_conditions || {};
-    const condNames = {
-        'htf_aligned': 'HTF', 'kill_zone': 'KZ', 'fvg_hit': 'FVG',
-        'ob_hit': 'OB', 'bos': 'BOS', 'volume_ok': 'VOL', 'liquidity_sweep': 'SWEEP'
-    };
-    const ictRaw = d.ict_score || 0;
-    document.getElementById('base-score').textContent = ictRaw + '/7';
-    document.getElementById('ict-score').textContent = '+' + ictRaw;
-    // Update condition badges if element exists
-    const condGrid = document.getElementById('cond-grid');
-    if (condGrid) {
-        condGrid.innerHTML = Object.entries(condNames).map(([k,label]) => {
-            const met = conds[k];
-            return '<span style="display:inline-block;margin:2px 3px;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold;background:'+(met?'#1a4a2e':'#4a1a1a')+';color:'+(met?'#4ade80':'#f87171')+'">'+label+(met?' ✓':' ✗')+'</span>';
-        }).join('');
-    }
-    const fs=document.getElementById('final-score');
-    fs.textContent=d.score+'%'; fs.style.color=d.take?'var(--green)':'var(--red)';
-    const bf=document.getElementById('bf');
-    document.getElementById('bp').textContent=d.score+'%';
-    bf.style.width=d.score+'%'; bf.style.background=d.take?'var(--green)':'var(--red)';
-
-    // Scores (ICT conditions handled above)
-
-    // SL/TP
-    document.getElementById('sl-p').textContent=d.sl_price?d.sl_price.toLocaleString():'—';
-    document.getElementById('tp-p').textContent=d.tp_price?d.tp_price.toLocaleString():'—';
-    document.getElementById('sl-d').textContent=d.sl_dist?d.sl_dist+' pts':'—';
-    document.getElementById('tp-d').textContent=d.sl_dist?(d.sl_dist*2).toFixed(1)+' pts (2R)':'—';
-
-    // MTF structure bar
-    const mtf=d.mtf||{};
-    ['w','d','4h','1h','15m'].forEach((k,i)=>{
-      const keys=['weekly','daily','4h','1h','15m'];
-      const el=document.getElementById('mtf-'+k);
-      if(el){
-        const s=mtf[keys[i]]||'—';
-        el.textContent=s.toUpperCase().slice(0,4);
-        el.className='mtf-val '+structClass(s);
-      }
-    });
-
-    // Metrics
-    const rc=v=>v>=45&&v<=65?'green':v<35||v>70?'red':'amber';
-    document.getElementById('mp').textContent=d.price?.toLocaleString()||'—';
-    const mr=document.getElementById('mr'); mr.className='m-val '+rc(d.rsi); mr.textContent=d.rsi;
-    const me=document.getElementById('me'); me.className='m-val '+(d.ema_diff>0?'green':'red');
-    me.textContent=(d.ema_diff>0?'+':'')+d.ema_diff;
-    const mv=document.getElementById('mv'); mv.className='m-val '+(d.vol_ratio>1.2?'green':d.vol_ratio<0.8?'red':'amber');
-    mv.textContent=d.vol_ratio+'x';
-    document.getElementById('ms').textContent=(d.session||'—').toUpperCase().replace('_',' ');
-    const mb=document.getElementById('mb'); mb.className='m-val '+(d.htf_bias==='bullish'?'green':'red');
-    mb.textContent=d.htf_bias;
-    document.getElementById('pt').textContent='NQ1! · '+(d.price?.toLocaleString()||'—');
-
-    // Model factors
-    document.getElementById('factors').innerHTML=(d.factors||[]).map(f=>
-      `<div class="factor ${f.rating}"><div class="f-left"><div class="f-dot"></div><span class="f-name">${f.name}</span></div><span class="f-val">${f.detail}</span></div>`
-    ).join('');
-
-    // ICT factors
-    document.getElementById('ict-factors-list').innerHTML=(d.ict_factors||[]).map(f=>`
-      <div class="ict-factor ${f.aligned?'ict-aligned':'ict-misaligned'}">
-        <div class="ict-left"><div class="ict-dot"></div>
-          <div><div class="ict-name">${f.name}</div><div class="ict-detail">${f.detail||''}</div></div>
-        </div>
-        <div class="ict-val">${f.value||'—'}</div>
-      </div>`).join('') || '<div class="empty-log">No ICT data yet</div>';
-
-    // MTF detail
-    document.getElementById('mtf-detail').innerHTML = mtf.weekly ? `
-      <div class="breakdown-row"><span class="breakdown-label">KZ Active</span><span style="color:${mtf.kz_active?'var(--green)':'var(--muted)'};font-weight:700">${(mtf.kz||'—').toUpperCase().replace('_',' ')}</span></div>
-      <div class="breakdown-row"><span class="breakdown-label">Daily FVG Target</span><span style="color:var(--blue);font-weight:700">${mtf.d_fvg_target||'None'}</span></div>
-      <div class="breakdown-row"><span class="breakdown-label">TF Alignment</span><span style="color:${(mtf.alignment||0)>=4?'var(--green)':(mtf.alignment||0)>=3?'var(--amber)':'var(--red)'};font-weight:700">${mtf.alignment||0}/5</span></div>
-      <div class="breakdown-row"><span class="breakdown-label">HTF Agreement</span><span style="color:${mtf.htf_agree?'var(--green)':'var(--red)'};font-weight:700">${mtf.htf_agree?'YES':'NO'}</span></div>
-      <div class="breakdown-row"><span class="breakdown-label">Liq Sweep</span><span style="color:${mtf.sweep?.swept?'var(--purple)':'var(--muted)'};font-weight:700">${mtf.sweep?.swept?(mtf.sweep.type||'').toUpperCase().replace('_',' '):'NONE'}</span></div>
-      <div class="breakdown-row"><span class="breakdown-label">Absorption</span><span style="color:${mtf.absorption?.absorbed?'var(--green)':'var(--muted)'};font-weight:700">${mtf.absorption?.absorbed?mtf.absorption.type.toUpperCase()+' '+mtf.absorption.vol_ratio+'x':'NONE'}</span></div>
-    ` : '<div class="empty-log">Fetching MTF data...</div>';
-
-    // Active trade
-    const atc=document.getElementById('atcard');
-    if(d.active_trade&&d.active_trade.result==='open'){
-      atc.style.display='block';
-      const at=d.active_trade;
-      const de=document.getElementById('at-dir');
-      de.textContent=at.direction?.toUpperCase(); de.style.color=at.direction==='long'?'var(--green)':'var(--red)';
-      document.getElementById('at-entry').textContent=at.entry?.toLocaleString()||'—';
-      document.getElementById('at-sl').textContent=at.sl?.toLocaleString()||'—';
-      document.getElementById('at-tp').textContent=at.tp?.toLocaleString()||'—';
-      const pnl=at.direction==='long'?d.price-at.entry:at.entry-d.price;
-      const pnlUsd=pnl*2;
-      const pe=document.getElementById('at-pnl');
-      pe.textContent=(pnl>=0?'+':'')+pnl.toFixed(2)+' pts ('+(pnlUsd>=0?'+':'-')+'$'+Math.abs(pnlUsd).toFixed(2)+')';
-      pe.style.color=pnl>=0?'var(--green)':'var(--red)';
-    } else { atc.style.display='none'; }
-
-    // Stats
-    const st=d.stats||{};
-    const pnl=st.total_pnl_usd||0;
-    const pb=document.getElementById('pnl-big');
-    pb.className='pnl-big '+(pnl>=0?'pos':'neg');
-    const pv=document.getElementById('pnl-val');
-    pv.textContent=(pnl>=0?'+':'-')+' $'+Math.abs(pnl).toFixed(2); pv.style.color=pnl>=0?'var(--green)':'var(--red)';
-    document.getElementById('sw').textContent=st.wins||0;
-    document.getElementById('sl2').textContent=st.losses||0;
-    document.getElementById('st-total').textContent=st.total||0;
-    const sr=document.getElementById('sr');
-    sr.textContent=st.total?st.win_rate+'%':'—';
-    sr.className='stat-val '+(st.win_rate>=70?'green':st.win_rate>=50?'amber':'red');
-    document.getElementById('sa-win').textContent=st.avg_win_pts?'+'+st.avg_win_pts+'pts':'—';
-    document.getElementById('sa-loss').textContent=st.avg_loss_pts?st.avg_loss_pts+'pts':'—';
-
-    // Trade type breakdown
-    const ttb=st.by_trade_type||{};
-    document.getElementById('type-breakdown').innerHTML=Object.keys(ttb).length
-      ?Object.entries(ttb).sort((a,b)=>b[1].wr-a[1].wr).map(([tt,v])=>
-        `<div class="breakdown-row">
-          <div><div class="breakdown-label">${tt.toUpperCase().replace('_',' ')}</div>
-          <div class="mini-bar"><div class="mini-bar-fill" style="width:${v.wr}%"></div></div></div>
-          <div style="text-align:right">
-            <div style="font-weight:700;color:${v.wr>=70?'var(--green)':v.wr>=50?'var(--amber)':'var(--red)'}">${v.wr}%</div>
-            <div style="font-size:9px;color:var(--muted)">${v.wins}W/${v.total-v.wins}L</div>
-          </div></div>`).join('')
-      :'<div class="empty-log">No trades yet</div>';
-
-    // Session breakdown
-    const sb=st.by_session||{};
-    document.getElementById('session-breakdown').innerHTML=Object.keys(sb).length
-      ?Object.entries(sb).sort((a,b)=>b[1].wr-a[1].wr).map(([s,v])=>
-        `<div class="breakdown-row">
-          <div><div class="breakdown-label">${s.toUpperCase()}</div>
-          <div class="mini-bar"><div class="mini-bar-fill" style="width:${v.wr}%"></div></div></div>
-          <div style="text-align:right">
-            <div style="font-weight:700;color:${v.wr>=70?'var(--green)':v.wr>=50?'var(--amber)':'var(--red)'}">${v.wr}%</div>
-            <div style="font-size:9px;color:var(--muted)">${v.wins}W/${v.total-v.wins}L · $${v.pnl.toFixed(0)}</div>
-          </div></div>`).join('')
-      :'<div class="empty-log">No trades yet</div>';
-
-    // Score breakdown
-    const scb=st.by_score||{};
-    document.getElementById('score-breakdown').innerHTML=Object.keys(scb).length
-      ?Object.entries(scb).sort((a,b)=>a[0].localeCompare(b[0])).map(([range,v])=>
-        `<div class="breakdown-row">
-          <div><div class="breakdown-label">Score ${range}%</div>
-          <div class="mini-bar"><div class="mini-bar-fill" style="width:${v.wr}%"></div></div></div>
-          <div style="text-align:right">
-            <div style="font-weight:700;color:${v.wr>=70?'var(--green)':v.wr>=50?'var(--amber)':'var(--red)'}">${v.wr}%</div>
-            <div style="font-size:9px;color:var(--muted)">${v.wins}W/${v.total-v.wins}L</div>
-          </div></div>`).join('')
-      :'<div class="empty-log">No trades yet</div>';
-
-    // Trade log
-    const trades=(d.trades||[]).slice().reverse();
-    const tbody=document.getElementById('tlog-body');
-    const empty=document.getElementById('tlog-empty');
-    if(trades.length){
-      empty.style.display='none';
-      tbody.innerHTML=trades.map(t=>{
-        const res=t.result||'open';
-        const pnlPts=t.pnl_pts!=null?t.pnl_pts:'—';
-        const pnlUsd=t.pnl_usd!=null?(t.pnl_usd>=0?'+$':'-$')+Math.abs(t.pnl_usd).toFixed(2):'—';
-        const pc=((t.pnl_pts||0)>=0)?'var(--green)':'var(--red)';
-        const tt=t.trade_type||'';
-        const typeBadge=tt.includes('cont')?`<span class="badge badge-cont">CONT</span>`:tt.includes('rev')?`<span class="badge badge-rev">REV</span>`:'—';
-        return `<tr>
-          <td style="color:var(--muted)">${(t.time||'').slice(11,16)||'—'}</td>
-          <td>${typeBadge}</td>
-          <td class="dir-${t.direction}">${(t.direction||'').toUpperCase()}</td>
-          <td>${t.entry?.toLocaleString()||'—'}</td>
-          <td style="color:var(--blue)">${t.score||'—'}%</td>
-          <td style="color:var(--muted)">${(t.session||'—').slice(0,6).toUpperCase()}</td>
-          <td style="color:var(--muted)">${t.exit_time||'—'}</td>
-          <td style="color:${pc}">${pnlPts!=='—'?(pnlPts>=0?'+':'')+pnlPts:'—'}</td>
-          <td style="color:${pc}">${pnlUsd}</td>
-          <td><span class="badge badge-${res}">${res.toUpperCase()}</span></td>
-        </tr>`;
-      }).join('');
-    } else { empty.style.display='block'; tbody.innerHTML=''; }
-
-    document.getElementById('ut').textContent='Updated '+d.last_update;
-    updatePauseBtn(d);
-  } catch(e){ console.error(e); }
-}
-
-function playAlert(){
-  try{
-    const ctx=new(window.AudioContext||window.webkitAudioContext)();
-    [0,150,300].forEach(delay=>{
-      const o=ctx.createOscillator(),g=ctx.createGain();
-      o.connect(g);g.connect(ctx.destination);
-      o.frequency.value=880;o.type='sine';
-      g.gain.setValueAtTime(0,ctx.currentTime+delay/1000);
-      g.gain.linearRampToValueAtTime(0.3,ctx.currentTime+delay/1000+0.05);
-      g.gain.linearRampToValueAtTime(0,ctx.currentTime+delay/1000+0.3);
-      o.start(ctx.currentTime+delay/1000);o.stop(ctx.currentTime+delay/1000+0.3);
-    });
-  }catch(e){}
-}
-
-async function closeTrade(r){
-  await fetch('/close_trade',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({result:r})});
-  refresh();
-}
-
-refresh(); setInterval(refresh,5000);
-</script>
-<div id="pauseBtn" onclick="openPauseMenu()" style="position:fixed;bottom:20px;right:20px;background:#e74c3c;color:white;border:none;width:56px;height:56px;border-radius:50%;font-size:20px;cursor:pointer;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-weight:bold;">⏸</div>
-
-<div id="pauseOverlay" onclick="closePauseMenu()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;"></div>
-
-<div id="pauseModal" style="display:none;position:fixed;bottom:90px;right:20px;background:#1a1a2e;border:1px solid #333;border-radius:12px;padding:16px;z-index:1001;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,0.5);">
-  <div style="color:white;font-size:13px;font-weight:bold;margin-bottom:10px;text-align:center;">⏸ PAUSE TRADING</div>
-  <div id="pauseStatus" style="color:#f39c12;font-size:11px;text-align:center;margin-bottom:8px;"></div>
-  <select id="pauseMins" style="width:100%;background:#2a2a3e;color:white;border:1px solid #444;padding:8px;border-radius:6px;font-size:13px;margin-bottom:10px;">
-    <option value="0">Manual resume</option>
-    <option value="5">5 minutes</option>
-    <option value="15">15 minutes</option>
-    <option value="30">30 minutes</option>
-    <option value="60">1 hour</option>
-    <option value="120">Rest of session (2h)</option>
-    <option value="480">Rest of day (8h)</option>
-    <option value="1440">Tomorrow (24h)</option>
-  </select>
-  <button id="pauseConfirmBtn" onclick="confirmPause()" style="width:100%;background:#e74c3c;color:white;border:none;padding:10px;border-radius:6px;font-weight:bold;font-size:13px;cursor:pointer;">⏸ PAUSE NOW</button>
-  <button onclick="closePauseMenu()" style="width:100%;background:transparent;color:#888;border:1px solid #333;padding:8px;border-radius:6px;font-size:12px;cursor:pointer;margin-top:6px;">Cancel</button>
-</div>
-
-<script>
-function openPauseMenu() {
-    const paused = document.getElementById('pauseBtn').dataset.paused === 'true';
-    if (paused) {
-        fetch('/resume', {method:'POST'}).then(()=>location.reload());
-        return;
-    }
-    document.getElementById('pauseModal').style.display = 'block';
-    document.getElementById('pauseOverlay').style.display = 'block';
-}
-function closePauseMenu() {
-    document.getElementById('pauseModal').style.display = 'none';
-    document.getElementById('pauseOverlay').style.display = 'none';
-}
-function confirmPause() {
-    const mins = parseInt(document.getElementById('pauseMins').value);
-    fetch('/pause', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({minutes:mins})})
-        .then(()=>{ closePauseMenu(); });
-}
-function updatePauseBtn(d) {
-    const btn = document.getElementById('pauseBtn');
-    const status = document.getElementById('pauseStatus');
-    if (!btn) return;
-    if (d.trading_paused) {
-        btn.textContent = '▶';
-        btn.style.background = '#27ae60';
-        btn.dataset.paused = 'true';
-        if (d.pause_until) {
-            const secs = Math.max(0, Math.round(d.pause_until - Date.now()/1000));
-            const mins = Math.floor(secs/60);
-            status.textContent = mins > 0 ? 'Paused — ' + mins + 'm left' : 'Paused — resuming...';
-        } else {
-            status.textContent = 'Paused — tap ▶ to resume';
-        }
-    } else {
-        btn.textContent = '⏸';
-        btn.style.background = '#e74c3c';
-        btn.dataset.paused = 'false';
-        status.textContent = '';
-    }
-}
-</script>
-</body></html>"""
-
-# ── Routes ────────────────────────────────────────────────────────────────────
-@app.route("/")
-def index():
-    fetch_and_score()
-    return render_template_string(HTML)
-
-
-@app.route("/pause", methods=["POST"])
-def pause_trading():
-    data = request.get_json() or {}
-    minutes = int(data.get("minutes", 0))
-    state["trading_paused"] = True
-    state["pause_until"] = time.time() + (minutes * 60) if minutes > 0 else None
-    msg = f"paused for {minutes}min" if minutes > 0 else "paused (manual resume)"
-    print(f"⏸️  Trading {msg}")
-    return jsonify({"status": "paused", "minutes": minutes})
-
-@app.route("/resume", methods=["POST"])
-def resume_trading():
-    state["trading_paused"] = False
-    state["pause_until"] = None
-    print("▶️  Trading RESUMED")
-    return jsonify({"status": "resumed"})
 
 @app.route("/state")
 def get_state():
-    fetch_and_score()
-    import numpy as np
-    def sanitize(obj):
-        if isinstance(obj, dict):
-            return {k: sanitize(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [sanitize(i) for i in obj]
-        elif isinstance(obj, (np.bool_, np.integer)):
-            return obj.item()
-        elif isinstance(obj, np.floating):
-            return float(obj)
+    with _lock:
+        s = dict(state)
+    trades = load_trades()
+    s["trades"] = trades
+    s["total_trades"] = len([t for t in trades if t["result"] in ("win","loss")])
+    # Convert numpy types for JSON serialization
+    def clean(obj):
+        if isinstance(obj, (np.integer,)): return int(obj)
+        if isinstance(obj, (np.floating,)): return float(obj)
+        if isinstance(obj, (np.bool_,)): return bool(obj)
         return obj
-    return jsonify(sanitize(state))
+    return jsonify({k: clean(v) if not isinstance(v, (dict, list)) else v for k, v in s.items()})
+
+
+@app.route("/trades")
+def get_trades():
+    trades = load_trades()
+    closed = [t for t in trades if t["result"] in ("win", "loss")]
+    wins   = [t for t in closed if t["result"] == "win"]
+    total_pnl = sum(t.get("pnl_pts", 0) or 0 for t in closed) * PNL_PER_PT
+    wr = round(len(wins) / len(closed) * 100, 1) if closed else 0.0
+    return jsonify({
+        "total": len(closed),
+        "wins": len(wins),
+        "losses": len(closed) - len(wins),
+        "win_rate": wr,
+        "total_pnl_usd": round(total_pnl, 2),
+        "capital": round(CAPITAL + total_pnl, 2),
+        "trades": trades,
+    })
+
+
+@app.route("/pause", methods=["POST"])
+def pause():
+    state["trading_paused"] = True
+    log.info("⏸️  Trading paused")
+    return jsonify({"status": "paused"})
+
+
+@app.route("/resume", methods=["POST"])
+def resume():
+    state["trading_paused"] = False
+    log.info("▶️  Trading resumed")
+    return jsonify({"status": "resumed"})
+
 
 @app.route("/close_trade", methods=["POST"])
-def close_trade():
-    data = freq.get_json(); result = data.get("result")
-    at   = state.get("active_trade")
-    if at and result in ("win","loss"):
-        _close_active(result, at, state.get("price", 0))
-        return jsonify({"ok": True})
-    return jsonify({"ok": False})
+def close_trade_manual():
+    with _lock:
+        at = state.get("active_trade")
+        if not at:
+            return jsonify({"error": "no active trade"}), 400
+        price = state.get("price", at["entry"])
+        pnl_pts = round(price - at["entry"] if at["direction"] == "long" else at["entry"] - price, 1)
+        at["result"] = "win" if pnl_pts > 0 else "loss"
+        at["exit_price"] = price
+        at["exit_time"]  = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        at["pnl_pts"] = pnl_pts
+        at["pnl_usd"] = round(pnl_pts * PNL_PER_PT, 2)
+        save_trade(at)
+        state["active_trade"] = None
+        total, wins, losses, wr, total_pnl = get_stats()
+        state.update({
+            "total_trades": total, "wins": wins, "losses": losses,
+            "win_rate": wr, "capital": round(CAPITAL + total_pnl, 2),
+            "pnl": round(total_pnl, 2),
+        })
+    return jsonify({"status": "closed", "pnl_pts": pnl_pts})
 
-def background_loop():
-    """Background thread: fetch and score every INTERVAL seconds."""
-    print("🚀 Background loop starting immediately...")
-    while True:
-        try:
-            fetch_and_score()
-        except Exception as e:
-            print(f"Background loop error: {e} — retrying in 15s")
-            time.sleep(15)
-            continue
-        time.sleep(INTERVAL)
 
+@app.route("/reset_trades", methods=["POST"])
+def reset_trades():
+    """Clear all trades for a fresh start"""
+    with open(TRADE_LOG, "w") as f:
+        json.dump([], f)
+    state.update({
+        "total_trades": 0, "wins": 0, "losses": 0,
+        "win_rate": 0.0, "capital": CAPITAL, "pnl": 0.0,
+        "active_trade": None,
+    })
+    log.info("🔄 Trades reset")
+    return jsonify({"status": "reset"})
+
+
+# ── Start ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    t = threading.Thread(target=background_loop, daemon=True)
+    t = threading.Thread(target=trading_loop, daemon=True)
     t.start()
-    print("\n🤖 IFVG Live AI v7 — Full MTF ICT Framework")
-    print("📊 Timeframes: Weekly → Daily → 4H → 1H → 15m → 5m")
-    print("🎯 ICT: FVG + OB + Liquidity + Structure + Kill Zone")
-    print(f"📱 Open: http://localhost:5001\n")
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5001)), debug=False)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
