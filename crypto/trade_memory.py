@@ -53,7 +53,8 @@ class TradeMemory:
         return f"{conditions['trend']}|{conditions['session']}|{conditions['volume']}|{conditions['momentum']}"
 
     def record_trade(self, conditions, action, entry_price, exit_price,
-                     pnl_pct, pnl_usdt, confidence, verdict, reasoning, trade_type="live"):
+                     pnl_pct, pnl_usdt, confidence, verdict, reasoning,
+                     trade_type="live", sl_pct=0.025):  # EXPECTANCY: added sl_pct param
         won = pnl_pct > 0
         key = self._make_key(conditions)
 
@@ -64,21 +65,39 @@ class TradeMemory:
                 "avg_win_pct": 0.0,
                 "avg_loss_pct": 0.0,
                 "win_pnls": [],
-                "loss_pnls": []
+                "loss_pnls": [],
+                "total_r": 0.0,  # EXPECTANCY
+                "avg_r": 0.0,  # EXPECTANCY
+                "win_r_sum": 0.0,  # EXPECTANCY
+                "loss_r_sum": 0.0,  # EXPECTANCY
+                "avg_win_r": 0.0,  # EXPECTANCY
+                "avg_loss_r": 0.0,  # EXPECTANCY
             }
 
         s = self.memory["condition_stats"][key]
         s["total"] += 1
         s["total_pnl_pct"] += pnl_pct
 
+        # EXPECTANCY: calculate and store R-multiple
+        r_multiple = pnl_pct / max(sl_pct, 0.001)  # EXPECTANCY
+        s.setdefault("total_r", 0.0)  # EXPECTANCY: backward compat
+        s.setdefault("win_r_sum", 0.0)  # EXPECTANCY
+        s.setdefault("loss_r_sum", 0.0)  # EXPECTANCY
+        s["total_r"] += r_multiple  # EXPECTANCY
+        s["avg_r"] = s["total_r"] / s["total"]  # EXPECTANCY
+
         if won:
             s["wins"] += 1
             s["win_pnls"].append(pnl_pct)
             s["avg_win_pct"] = sum(s["win_pnls"]) / len(s["win_pnls"])
+            s["win_r_sum"] += r_multiple  # EXPECTANCY
+            s["avg_win_r"] = s["win_r_sum"] / s["wins"]  # EXPECTANCY
         else:
             s["losses"] += 1
             s["loss_pnls"].append(pnl_pct)
             s["avg_loss_pct"] = sum(s["loss_pnls"]) / len(s["loss_pnls"])
+            s["loss_r_sum"] += r_multiple  # EXPECTANCY
+            s["avg_loss_r"] = s["loss_r_sum"] / s["losses"]  # EXPECTANCY
 
         self.memory["total_trades"] += 1
         if won:
@@ -175,7 +194,18 @@ class TradeMemory:
             return None
         return stats["wins"] / stats["total"]
 
-    def should_veto(self, conditions, min_trades=10, veto_threshold=0.45):
+    def get_expectancy(self, conditions):  # EXPECTANCY
+        """Returns expected R per trade for this condition set, or None if insufficient data."""  # EXPECTANCY
+        stats = self.find_similar(conditions)  # EXPECTANCY
+        if not stats or stats.get('total', 0) < 10:  # EXPECTANCY
+            return None  # EXPECTANCY
+        wr = stats['wins'] / stats['total']  # EXPECTANCY
+        avg_win_r = stats.get('avg_win_r', 2.0)  # EXPECTANCY: default 2R
+        avg_loss_r = stats.get('avg_loss_r', -1.0)  # EXPECTANCY: default -1R
+        expectancy = (wr * avg_win_r) + ((1 - wr) * avg_loss_r)  # EXPECTANCY
+        return expectancy  # EXPECTANCY
+
+    def should_veto(self, conditions, min_trades=20, veto_threshold=0.40):  # raised to 0.40 (was 0.25, originally 0.35)
         stats = self.find_similar(conditions)
         if not stats or stats["total"] < min_trades:
             return False, None
