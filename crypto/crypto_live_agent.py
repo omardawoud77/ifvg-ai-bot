@@ -35,10 +35,10 @@ from position_auditor import PositionAuditor
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 SYMBOLS         = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
-TRADE_NOTIONAL  = 1500.0         # USDT notional per trade per symbol
-LEVERAGE        = 3              # 3× leverage
+TRADE_NOTIONAL  = 3000.0         # USDT notional per trade per symbol
+LEVERAGE        = 5              # 5× leverage
 FETCH_EVERY     = 60             # seconds between cycles (1 min)
-MAX_DAILY_TRADES = 3             # max NEW entries per UTC day PER SYMBOL (was 6 — reduced to force selectivity)
+MAX_DAILY_TRADES = 2             # max NEW entries per UTC day PER SYMBOL
 MAX_CONSECUTIVE_LOSSES = 3       # disable symbol after N consecutive losses
 MAX_CONCURRENT_POSITIONS = 2     # max symbols open simultaneously (correlation risk)
 RISK_PER_TRADE_PCT = 0.01       # risk 1% of balance per trade
@@ -122,7 +122,7 @@ DEFAULT_STATE = {
     "last_trade_date": None,
     "sl_pct": 0.015,
     "sl_price": 0.0,  # SL_SOFTWARE: absolute SL price for software-managed stop
-    "tp_pct": 0.04,
+    "tp_pct": 0.03,
     "entry_conditions": None,
     "entry_confidence": 0.5,
     "entry_verdict": None,
@@ -980,6 +980,19 @@ def process_symbol(symbol, ctx):
                 close_reason = f"AUDITOR: {state.get('_auditor_reason', 'thesis broken')}"
                 state.pop('_auditor_exit', None)
                 state.pop('_auditor_reason', None)
+
+            # 8-hour intraday time limit — force close any position held > 8h
+            if not force_close and state.get('entry_time'):
+                try:
+                    entry_dt = datetime.fromisoformat(state['entry_time'])
+                    held_seconds = (datetime.now(timezone.utc) - entry_dt).total_seconds()
+                    if held_seconds > 8 * 3600:
+                        force_close = True
+                        close_reason = "TIME_LIMIT: 8h intraday limit"
+                        log.warning(f"{tag} ⏰ TIME LIMIT: position held "
+                                    f"{held_seconds/3600:.1f}h > 8h — force closing")
+                except Exception as _te:
+                    log.warning(f"{tag} Could not check entry time for 8h limit: {_te}")
 
             # Unrealized PnL (used for account protection + voluntary close gate)
             upnl_pct = (current_price - entry) / entry * state['position']

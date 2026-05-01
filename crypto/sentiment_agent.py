@@ -252,7 +252,17 @@ class SentimentAgent:
                 "https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest",
                 timeout=REQUEST_TIMEOUT
             )
-            articles = resp.json().get('Data', [])[:MAX_NEWS_ARTICLES]
+            payload = resp.json()
+            if not isinstance(payload, dict):
+                log.warning(f"[SENTIMENT] CryptoCompare unexpected response type: {type(payload)}")
+                return []
+            raw = payload.get('Data', [])
+            if not isinstance(raw, list):
+                log.warning(f"[SENTIMENT] CryptoCompare 'Data' field is not a list "
+                            f"(got {type(raw).__name__}) — API may have returned an error: "
+                            f"{payload.get('Message', 'no message')}")
+                return []
+            articles = raw[:MAX_NEWS_ARTICLES]
             cutoff = time.time() - (NEWS_LOOKBACK_HOURS * 3600)
             return [
                 {
@@ -262,7 +272,7 @@ class SentimentAgent:
                     'source': 'cryptocompare'
                 }
                 for a in articles
-                if a.get('published_on', 0) > cutoff
+                if isinstance(a, dict) and a.get('published_on', 0) > cutoff
             ]
         except Exception as e:
             log.warning(f"[SENTIMENT] CryptoCompare news fetch failed: {e}")
