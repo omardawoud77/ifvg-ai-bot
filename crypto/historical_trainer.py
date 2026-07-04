@@ -24,8 +24,8 @@ from trade_memory import TradeMemory
 
 # ── Config ────────────────────────────────────────────────────────────────────
 SYMBOL      = sys.argv[1] if len(sys.argv) > 1 else "BTCUSDT"
-SL_PCT      = 0.02       # 2% stop loss
-TP_PCT      = 0.04       # 4% take profit (2R)
+SL_PCT      = 0.025      # 2.5% stop loss — matches new get_dynamic_sl_tp() default
+TP_PCT      = 0.05       # 5% take profit (2R)
 MAX_BARS    = 48         # max hold time in bars
 MODEL_PATH  = "crypto_mtf_best.zip"
 # Per-symbol output paths — BTCUSDT keeps the legacy filenames for backward compat
@@ -148,6 +148,8 @@ def train(df, model, memory):
     trades_recorded = 0
     bars_processed = 0
     skipped_off_hours = 0
+    total_signals = 0  # REJECT AUDIT
+    rejected_trades = []  # REJECT AUDIT: list of dicts for analysis
 
     # We need at least 50 bars of history before we start
     start_idx = 50
@@ -202,17 +204,15 @@ def train(df, model, memory):
 
         # Get reasoning verdict
         try:
-            verdict, confidence, reasoning_text = decide(
+            verdict, confidence, reasoning_text, tier = decide(  # QUALITY TIER: unpack tier
                 action, conditions, perception, memory, narrative
             )
         except Exception:
             continue
 
-        # Only simulate trades the reasoning engine would execute
-        if verdict not in ("EXECUTE", "WEAK_EXECUTE"):
-            continue
+        total_signals += 1  # REJECT AUDIT
 
-        # Simulate the trade outcome
+        # Simulate the trade outcome for ALL signals (executed + rejected)  # REJECT AUDIT
         direction = 1 if action == 1 else -1
         try:
             pnl_pct, bars_held, exit_reason = simulate_trade(df, i, direction)
@@ -222,6 +222,42 @@ def train(df, model, memory):
         entry_price = float(df.iloc[i]['close'])
         exit_price = entry_price * (1 + pnl_pct * direction) if direction == 1 \
             else entry_price * (1 - pnl_pct)
+
+        # REJECT AUDIT: log rejected trades to CSV and track for summary
+        if verdict not in ("EXECUTE", "WEAK_EXECUTE"):
+            import csv  # REJECT AUDIT
+            won = pnl_pct > 0  # REJECT AUDIT
+            regime = conditions.get('regime', 'UNKNOWN')  # REJECT AUDIT
+            rejected_trades.append({  # REJECT AUDIT
+                'won': won,  # REJECT AUDIT
+                'pnl_pct': pnl_pct,  # REJECT AUDIT
+                'regime': regime,  # REJECT AUDIT
+                'confidence': confidence,  # REJECT AUDIT
+                'reasoning': reasoning_text[:300],  # REJECT AUDIT
+                'trend': conditions.get('trend', ''),  # REJECT AUDIT
+                'momentum': conditions.get('momentum', ''),  # REJECT AUDIT
+            })  # REJECT AUDIT
+            with open(HIST_LOG, "a", newline="") as f:  # REJECT AUDIT
+                writer = csv.writer(f)  # REJECT AUDIT
+                writer.writerow([  # REJECT AUDIT
+                    datetime.now(timezone.utc).isoformat(),  # REJECT AUDIT
+                    "rejected",  # REJECT AUDIT
+                    "BUY" if action == 1 else "SELL",  # REJECT AUDIT
+                    entry_price,  # REJECT AUDIT
+                    exit_price,  # REJECT AUDIT
+                    f"{pnl_pct:.4f}",  # REJECT AUDIT
+                    f"{pnl_pct * 110:.2f}",  # REJECT AUDIT
+                    won,  # REJECT AUDIT
+                    conditions.get("trend", ""),  # REJECT AUDIT
+                    conditions.get("momentum", ""),  # REJECT AUDIT
+                    conditions.get("volume", ""),  # REJECT AUDIT
+                    conditions.get("volatility", ""),  # REJECT AUDIT
+                    conditions.get("session", ""),  # REJECT AUDIT
+                    f"{confidence:.2f}",  # REJECT AUDIT
+                    verdict,  # REJECT AUDIT
+                    reasoning_text[:200],  # REJECT AUDIT
+                ])  # REJECT AUDIT
+            continue  # REJECT AUDIT: don't record in memory
 
         # Record in memory
         memory.record_trade(
@@ -234,7 +270,8 @@ def train(df, model, memory):
             confidence=confidence,
             verdict=verdict,
             reasoning=reasoning_text[:200],
-            trade_type="historical"
+            trade_type="historical",
+            sl_pct=SL_PCT,  # EXPECTANCY: pass SL for R-multiple calculation
         )
 
         trades_recorded += 1
@@ -242,7 +279,80 @@ def train(df, model, memory):
         # Skip ahead to avoid overlapping trades
         i_next = i + bars_held
 
-    return trades_recorded
+    return trades_recorded, total_signals, rejected_trades  # REJECT AUDIT
+
+
+# ── Reject audit summary ─────────────────────────────────────────────────────
+# REJECT AUDIT
+
+def print_reject_audit(total_signals, trades_recorded, rejected_trades):  # REJECT AUDIT
+    """Print a detailed breakdown of rejected trades."""  # REJECT AUDIT
+    num_rejected = len(rejected_trades)  # REJECT AUDIT
+    print(f"\n{'='*70}")  # REJECT AUDIT
+    print(f"REJECT AUDIT")  # REJECT AUDIT
+    print(f"{'='*70}")  # REJECT AUDIT
+    print(f"Total signals evaluated: {total_signals}")  # REJECT AUDIT
+    print(f"Executed: {trades_recorded} ({trades_recorded/max(1,total_signals):.1%})")  # REJECT AUDIT
+    print(f"Rejected: {num_rejected} ({num_rejected/max(1,total_signals):.1%})")  # REJECT AUDIT
+
+    if num_rejected == 0:  # REJECT AUDIT
+        print("No rejected trades to analyze.")  # REJECT AUDIT
+        return  # REJECT AUDIT
+
+    won_count = sum(1 for r in rejected_trades if r['won'])  # REJECT AUDIT
+    lost_count = num_rejected - won_count  # REJECT AUDIT
+    print(f"\nOf rejected trades:")  # REJECT AUDIT
+    print(f"  Would have WON:  {won_count} ({won_count/num_rejected:.1%}) "  # REJECT AUDIT
+          f"← false negatives")  # REJECT AUDIT
+    print(f"  Would have LOST: {lost_count} ({lost_count/num_rejected:.1%}) "  # REJECT AUDIT
+          f"← correct rejections")  # REJECT AUDIT
+
+    # Regime breakdown  # REJECT AUDIT
+    regimes = {}  # REJECT AUDIT
+    for r in rejected_trades:  # REJECT AUDIT
+        regime = r['regime']  # REJECT AUDIT
+        if regime not in regimes:  # REJECT AUDIT
+            regimes[regime] = {'total': 0, 'won': 0}  # REJECT AUDIT
+        regimes[regime]['total'] += 1  # REJECT AUDIT
+        if r['won']:  # REJECT AUDIT
+            regimes[regime]['won'] += 1  # REJECT AUDIT
+
+    print(f"\nRejection breakdown by regime:")  # REJECT AUDIT
+    for regime in sorted(regimes.keys()):  # REJECT AUDIT
+        stats = regimes[regime]  # REJECT AUDIT
+        wr = stats['won'] / max(1, stats['total'])  # REJECT AUDIT
+        print(f"  {regime:20s}: {stats['total']:4d} rejected, "  # REJECT AUDIT
+              f"{wr:.1%} would have won")  # REJECT AUDIT
+
+    # Filter breakdown — extract evidence_against reasons from reasoning text  # REJECT AUDIT
+    reason_counts = {}  # REJECT AUDIT
+    reason_won_counts = {}  # REJECT AUDIT
+    for r in rejected_trades:  # REJECT AUDIT
+        reasoning = r['reasoning']  # REJECT AUDIT
+        # Extract lines that start with evidence markers  # REJECT AUDIT
+        for line in reasoning.split('\n'):  # REJECT AUDIT
+            line = line.strip()  # REJECT AUDIT
+            if line.startswith('❌'):  # REJECT AUDIT
+                reason = line.lstrip('❌ ').strip()  # REJECT AUDIT
+                reason_counts[reason] = reason_counts.get(reason, 0) + 1  # REJECT AUDIT
+                if r['won']:  # REJECT AUDIT
+                    reason_won_counts[reason] = reason_won_counts.get(reason, 0) + 1  # REJECT AUDIT
+
+    if reason_counts:  # REJECT AUDIT
+        print(f"\nTop rejection reasons (filter that blocked trade):")  # REJECT AUDIT
+        sorted_reasons = sorted(reason_counts.items(), key=lambda x: -x[1])  # REJECT AUDIT
+        for reason, count in sorted_reasons[:15]:  # REJECT AUDIT
+            won = reason_won_counts.get(reason, 0)  # REJECT AUDIT
+            wr = won / max(1, count)  # REJECT AUDIT
+            print(f"  {count:4d}x | {wr:.0%} would-have-won | {reason[:80]}")  # REJECT AUDIT
+
+    # Confidence distribution of rejected trades  # REJECT AUDIT
+    confs = [r['confidence'] for r in rejected_trades]  # REJECT AUDIT
+    print(f"\nRejected confidence distribution:")  # REJECT AUDIT
+    print(f"  Min: {min(confs):.2f} | "  # REJECT AUDIT
+          f"Median: {sorted(confs)[len(confs)//2]:.2f} | "  # REJECT AUDIT
+          f"Max: {max(confs):.2f}")  # REJECT AUDIT
+    print(f"{'='*70}\n")  # REJECT AUDIT
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -271,7 +381,7 @@ if __name__ == "__main__":
     print(f"💾 Saved dataset to {DATASET_PKL}")
 
     # Train
-    total_trades = train(df, model, memory)
+    total_trades, total_signals, rejected_trades = train(df, model, memory)  # REJECT AUDIT
 
     # Update metadata
     memory.memory["meta"]["training_bars"] = len(df)
@@ -280,6 +390,9 @@ if __name__ == "__main__":
     # Print summary
     print(f"\n✅ Training complete — {total_trades} trades recorded")
     memory.print_summary()
+
+    # REJECT AUDIT: print reject analysis
+    print_reject_audit(total_signals, total_trades, rejected_trades)  # REJECT AUDIT
 
     print("\n📁 Files generated:")
     print(f"  — {MEMORY_FILE}  (agent's brain — commit this to GitHub)")

@@ -246,11 +246,17 @@ class SentimentAgent:
             return {'value': 50, 'label': 'Neutral', 'timestamp': None}
 
     def _fetch_cryptocompare_news(self) -> list:
-        """CryptoCompare News API — free tier, no key for basic use."""
+        """CryptoCompare News API — requires API key in CRYPTOCOMPARE_API_KEY env var."""
+        import os
+        api_key = os.environ.get('CRYPTOCOMPARE_API_KEY', '')
+        if not api_key:
+            log.warning("[SENTIMENT] CryptoCompare skipped — CRYPTOCOMPARE_API_KEY not set")
+            return []
         try:
             resp = requests.get(
                 "https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest",
-                timeout=REQUEST_TIMEOUT
+                timeout=REQUEST_TIMEOUT,
+                headers={'Authorization': f'Apikey {api_key}'},
             )
             payload = resp.json()
             if not isinstance(payload, dict):

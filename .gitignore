@@ -1,1 +1,26 @@
+# OS / editor junk
+.DS_Store
+__pycache__/
+
+# Logs
+*.log
+crypto/logs_tech/
+
+# Model artifacts & bulky data dumps (reproducible, not source)
+*.zip
+nq_*.pkl
+booster.json
+backtest_results.json
+backtest_v2_results.json
+trades_export*.csv
+real_trades*.csv
+
+# Backup copies of tracked files
+*_backup.py
+
+# Runtime state (lives on the Railway volume in production)
+crypto/disabled_symbols.json
+crypto/crypto_live_state.json
+
+# Phase 2: downloaded market data stays local
 phase2/data/

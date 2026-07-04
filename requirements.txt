@@ -1,13 +1,8 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
-flask
-joblib
-numpy
-pandas
-requests
-scikit-learn
-xgboost
-yfinance
-stable-baselines3==2.7.1
-gymnasium
-torch
 python-binance==1.0.19
+stable-baselines3==2.7.1
+gymnasium==1.1.1
+shimmy>=0.2.1
+pandas==2.3.3
+numpy==2.0.2
+torch==2.8.0

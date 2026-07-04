@@ -98,6 +98,47 @@ def perceive(df, state):
         bullish_fvg = float(bar_3ago.get('high', bar_3ago['close'])) < bar_low
         bearish_fvg = float(bar_3ago.get('low',  bar_3ago['close'])) > bar_high
 
+    # ── Composite-regime inputs: EMAs, SMA, structure, multi-window momentum ──
+    # Use only closed bars (df[:-1]) so the live in-progress bar doesn't skew slope.
+    closes_closed = df['close'].iloc[:-1] if len(df) > 1 else df['close']
+
+    if len(closes_closed) >= 20:
+        ema20_arr = closes_closed.ewm(span=20, adjust=False).mean().values
+        ema50_arr = closes_closed.ewm(span=50, adjust=False).mean().values
+        if len(ema20_arr) >= 10:
+            e20_now, e20_then = float(ema20_arr[-1]), float(ema20_arr[-10])
+            ema20_slope = (e20_now - e20_then) / max(abs(e20_then), 1e-9)
+        else:
+            ema20_slope = 0.0
+        if len(ema50_arr) >= 10:
+            e50_now, e50_then = float(ema50_arr[-1]), float(ema50_arr[-10])
+            ema50_slope = (e50_now - e50_then) / max(abs(e50_then), 1e-9)
+        else:
+            ema50_slope = 0.0
+        sma20_val      = float(closes_closed.iloc[-20:].mean())
+        price_vs_sma20 = (close - sma20_val) / max(sma20_val, 1e-9)
+    else:
+        ema20_slope = 0.0
+        ema50_slope = 0.0
+        price_vs_sma20 = 0.0
+
+    if len(df) >= 11 and 'high' in df.columns and 'low' in df.columns:
+        highs_closed = df['high'].iloc[:-1].values
+        lows_closed  = df['low'].iloc[:-1].values
+        recent_high = float(np.max(highs_closed[-5:]))
+        prev_high   = float(np.max(highs_closed[-10:-5]))
+        recent_low  = float(np.min(lows_closed[-5:]))
+        prev_low    = float(np.min(lows_closed[-10:-5]))
+        higher_highs = recent_high > prev_high
+        higher_lows  = recent_low  > prev_low
+        lower_highs  = recent_high < prev_high
+        lower_lows   = recent_low  < prev_low
+    else:
+        higher_highs = higher_lows = lower_highs = lower_lows = False
+
+    bars_back_10 = df.iloc[-12]['close'] if len(df) >= 12 else df.iloc[0]['close']
+    bars_back_20 = df.iloc[-22]['close'] if len(df) >= 22 else df.iloc[0]['close']
+
     return {
         "price":           close,
         "price_vs_4h":     (close - h4_close) / max(h4_close, 0.01),
@@ -121,6 +162,16 @@ def perceive(df, state):
         "is_doji":         is_doji,
         "bullish_fvg":     bullish_fvg,
         "bearish_fvg":     bearish_fvg,
+        # Composite-regime inputs
+        "ema20_slope":     ema20_slope,
+        "ema50_slope":     ema50_slope,
+        "price_vs_sma20":  price_vs_sma20,
+        "higher_highs":    higher_highs,
+        "higher_lows":     higher_lows,
+        "lower_highs":     lower_highs,
+        "lower_lows":      lower_lows,
+        "return_10bars":   (close - float(bars_back_10)) / max(float(bars_back_10), 0.01),
+        "return_20bars":   (close - float(bars_back_20)) / max(float(bars_back_20), 0.01),
     }
 
 
@@ -241,60 +292,106 @@ def interpret(perception):
 # ── LAYER 2.5: REGIME CLASSIFIER ─────────────────────────────────────────────
 
 def classify_regime(conditions, perception):
-    trend      = conditions['trend']
-    momentum   = conditions['momentum']
-    volatility = conditions['volatility']
-    volume     = conditions['volume']
-    atr_pct    = perception['atr_pct']
+    """
+    Composite regime classifier.
 
-    if volatility == 'HIGH' and atr_pct > 0.025:
-        return 'HIGH_VOLATILITY'
+    Replaces the old "price-vs-EMA stack" labeller, which lagged badly on
+    real recoveries (e.g. SOL +6.5% off lows still tagged STRONG_BEAR because
+    long-period EMAs hadn't caught up).
 
-    if (trend == 'STRONG_BULL'
-            and momentum in ('STRONG_UP', 'WEAK_UP')
-            and volatility != 'HIGH'):
+    Sums four normalized signals into a [-2, +2] direction score:
+      (a) EMA slope     — avg pct change of 20/50 EMA over last 10 closed bars
+                          (saturates at ±2%)
+      (b) Structure     — higher-highs/higher-lows vs lower-highs/lower-lows
+      (c) Price vs SMA  — close vs 20-bar SMA  (±0.5)
+      (d) Multi-window momentum — avg of 3/10/20-bar pct change (saturates at ±3%)
+
+    Mapping:
+       score >=  1.5  → STRONG_BULL
+       score  >  0.5  → TRENDING_BULL
+       score  > -0.5  → RANGING
+       score >= -1.5  → TRENDING_BEAR
+       score <  -1.5  → STRONG_BEAR
+    Very low ATR (<0.3%) short-circuits to LOW_QUALITY.
+    """
+    atr_pct = float(perception.get('atr_pct', 0.0))
+
+    if atr_pct < 0.003:
+        return 'LOW_QUALITY'
+
+    score = 0.0
+
+    # (a) EMA slope
+    ema20_slope = float(perception.get('ema20_slope', 0.0))
+    ema50_slope = float(perception.get('ema50_slope', 0.0))
+    avg_slope   = (ema20_slope + ema50_slope) / 2.0
+    score += max(-1.0, min(1.0, avg_slope / 0.02))
+
+    # (b) Recent structure
+    hh = bool(perception.get('higher_highs', False))
+    hl = bool(perception.get('higher_lows',  False))
+    lh = bool(perception.get('lower_highs',  False))
+    ll = bool(perception.get('lower_lows',   False))
+    if hh and hl:
+        score += 1.0
+    elif lh and ll:
+        score -= 1.0
+    elif hh or hl:
+        score += 0.5
+    elif lh or ll:
+        score -= 0.5
+
+    # (c) Price vs 20-bar SMA
+    price_vs_sma20 = float(perception.get('price_vs_sma20', 0.0))
+    if price_vs_sma20 > 0:
+        score += 0.5
+    elif price_vs_sma20 < 0:
+        score -= 0.5
+
+    # (d) Multi-window momentum
+    r3  = float(perception.get('return_3bars',  0.0))
+    r10 = float(perception.get('return_10bars', 0.0))
+    r20 = float(perception.get('return_20bars', 0.0))
+    avg_mom = (r3 + r10 + r20) / 3.0
+    score += max(-1.0, min(1.0, avg_mom / 0.03))
+
+    if score >= 1.5:
+        return 'STRONG_BULL'
+    if score > 0.5:
         return 'TRENDING_BULL'
-
-    if (trend == 'STRONG_BEAR'
-            and momentum in ('STRONG_DOWN', 'WEAK_DOWN')
-            and volatility != 'HIGH'):
-        return 'TRENDING_BEAR'
-
-    if (trend in ('MILD_BULL', 'MILD_BEAR')
-            and momentum in ('WEAK_UP', 'WEAK_DOWN')
-            and volume in ('LOW', 'NORMAL')):
+    if score > -0.5:
         return 'RANGING'
-
-    return 'LOW_QUALITY'
+    if score >= -1.5:
+        return 'TRENDING_BEAR'
+    return 'STRONG_BEAR'
 
 
 # ── LAYER 3: REASONING ENGINE (FIXED) ────────────────────────────────────────
 
-def reason(ppo_action, conditions, perception, memory, sentiment_signal=None):
+def reason(ppo_action, conditions, perception, memory, sentiment_signal=None,
+           model_probs=None):
     """
     sentiment_signal: dict from SentimentAgent, e.g.:
         {'direction': 'BEARISH', 'strength': 0.7, 'sources': [...]}
+    model_probs: optional np.array of PPO policy action probabilities
+        [P(HOLD), P(LONG), P(SHORT), P(CLOSE)]. When provided, the model's
+        own conviction becomes the PRIMARY confidence signal and the
+        rule checklist below is demoted to a secondary modifier + hard vetoes.
+        (PROB_GATE fix: the old rule-only confidence was historically
+        inverted — rejected trades won 51% vs 32% for executed ones.)
     Returns (verdict, confidence, evidence_for, evidence_against)
     """
     evidence_for     = []
     evidence_against = []
-    confidence       = 0.40   # baseline — must earn above 0.45 to execute
+    confidence       = 0.30   # baseline — must earn above 0.45 to execute
 
     action_is_long  = ppo_action == 1
     action_is_short = ppo_action == 2
 
     if action_is_long or action_is_short:
 
-        # ── FIX 1: Regime direction hard-block ───────────────────────────────
-        # Based on trade memory: STRONG_BEAR conditions are 10-20% WR for LONGs.
-        # No counter-trend boosts — they were actively hurting performance.
+        # ── Regime direction hard-blocks REMOVED: any direction allowed in any regime ──
         regime = conditions.get('regime', 'LOW_QUALITY')
-        if action_is_long and regime == 'TRENDING_BEAR':
-            evidence_against.append("HARD BLOCK: TRENDING_BEAR regime — LONGs forbidden")
-            return "HARD_REJECT", 0.0, evidence_for, evidence_against
-        if action_is_short and regime == 'TRENDING_BULL':
-            evidence_against.append("HARD BLOCK: TRENDING_BULL regime — SHORTs forbidden")
-            return "HARD_REJECT", 0.0, evidence_for, evidence_against
 
         # ── FIX 2: OFF_HOURS block for new entries ───────────────────────────
         if conditions.get('session') == 'OFF_HOURS':
@@ -312,9 +409,9 @@ def reason(ppo_action, conditions, perception, memory, sentiment_signal=None):
             elif conditions['trend'] == 'MILD_BEAR':
                 evidence_against.append("Mild downtrend — long against trend")
                 confidence -= 0.10   # restored
-            elif conditions['trend'] == 'STRONG_BEAR':
+            elif conditions['trend'] == 'STRONG_BEAR' and conditions.get('regime') not in ('STRONG_BULL', 'TRENDING_BULL'):
                 evidence_against.append("Strong downtrend — long strongly against trend")
-                confidence -= 0.22   # restored (was -0.11 in broken version)
+                confidence -= 0.15   # skipped when composite regime overrides EMA-stack as bullish
 
         if action_is_short:
             if conditions['trend'] == 'STRONG_BEAR':
@@ -326,9 +423,9 @@ def reason(ppo_action, conditions, perception, memory, sentiment_signal=None):
             elif conditions['trend'] == 'MILD_BULL':
                 evidence_against.append("Mild uptrend — short against trend")
                 confidence -= 0.10   # restored
-            elif conditions['trend'] == 'STRONG_BULL':
+            elif conditions['trend'] == 'STRONG_BULL' and conditions.get('regime') not in ('STRONG_BEAR', 'TRENDING_BEAR'):
                 evidence_against.append("Strong uptrend — short strongly against trend")
-                confidence -= 0.22   # restored
+                confidence -= 0.15   # PROB_GATE: symmetric with long penalty (was -0.22, suppressed all shorts)
 
         # ── Momentum ──────────────────────────────────────────────────────────
         if action_is_long and conditions['momentum'] in ('STRONG_UP', 'WEAK_UP'):
@@ -417,7 +514,7 @@ def reason(ppo_action, conditions, perception, memory, sentiment_signal=None):
         # ── Memory check (veto threshold raised to 40%) ───────────────────────
         veto, wr = memory.should_veto(conditions)
         if veto:
-            evidence_against.append(f"MEMORY VETO: setup has only {wr:.0%} WR historically (threshold 40%)")
+            evidence_against.append(f"MEMORY VETO: setup has only {wr:.0%} WR historically (threshold 25%)")
             confidence -= 0.30
         else:
             adj = memory.confidence_adjustment(conditions)
@@ -428,7 +525,7 @@ def reason(ppo_action, conditions, perception, memory, sentiment_signal=None):
             elif adj < -0.02:
                 wr_val = memory.get_win_rate(conditions)
                 evidence_against.append(f"Memory: similar setups won only {wr_val:.0%} historically")
-                confidence += adj
+                confidence += adj * 0.5   # penalty weight halved — was dragging confidence too low
 
         # ── Regret adjustment ─────────────────────────────────────────────────
         regret_adj = memory.get_regret_adjustment(conditions)
@@ -475,27 +572,51 @@ def reason(ppo_action, conditions, perception, memory, sentiment_signal=None):
             confidence += 0.05
 
     confidence = max(0.05, min(0.95, confidence))
+    rule_conf  = confidence   # PROB_GATE: keep checklist score separate
 
-    # ── FIX 3: Restored real confidence gate — 0.45 minimum ─────────────────
+    # ── PROB_GATE: model conviction as primary signal ────────────────────────
+    model_conf = None
+    if model_probs is not None and ppo_action in (1, 2):
+        try:
+            model_conf = float(model_probs[int(ppo_action)])
+            evidence_for.append(f"Model conviction P({'LONG' if ppo_action == 1 else 'SHORT'})={model_conf:.0%}")
+            # Blend: model is primary, checklist is secondary
+            confidence = max(0.05, min(0.95, 0.60 * model_conf + 0.40 * rule_conf))
+        except Exception:
+            model_conf = None
+
+    # ── Confidence gate ──────────────────────────────────────────────────────
     if ppo_action in (1, 2):
         veto_fired, veto_wr = memory.should_veto(conditions)
         regime    = conditions.get('regime', 'LOW_QUALITY')
         atr_pct   = perception.get('atr_pct', 0.0)
-        high_vol  = (regime == 'HIGH_VOLATILITY' and atr_pct > 0.03)
 
         if veto_fired:
             verdict = "REJECT"
-            evidence_against.append(f"Memory veto: WR={veto_wr:.0%} < 40% threshold")
-        elif high_vol:
-            verdict = "REJECT"
-            evidence_against.append(f"Extreme volatility block: ATR={atr_pct:.2%}")
+            evidence_against.append(f"Memory veto: WR={veto_wr:.0%} < 25% threshold")
+        elif model_conf is not None:
+            # PROB_GATE: gate on the model's own probability first; the
+            # checklist can only veto (rule_conf < 0.30 = actively hostile
+            # conditions like OFF_HOURS proximity, stacked counter-evidence).
+            if model_conf >= 0.55 and rule_conf >= 0.30:
+                verdict = "EXECUTE"
+            elif model_conf >= 0.45 and rule_conf >= 0.30:
+                verdict = "WEAK_EXECUTE"
+            else:
+                verdict = "REJECT"
+                if model_conf < 0.45:
+                    evidence_against.append(
+                        f"Model conviction {model_conf:.0%} below 0.45 minimum gate")
+                else:
+                    evidence_against.append(
+                        f"Checklist veto: rule confidence {rule_conf:.0%} < 0.30")
         elif confidence >= 0.45:
-            verdict = "EXECUTE"
-        elif confidence >= 0.40:
+            verdict = "EXECUTE"        # legacy path (no probs available)
+        elif confidence >= 0.30:
             verdict = "WEAK_EXECUTE"   # only Tier B at 50% size allowed
         else:
-            verdict = "REJECT"         # below 0.40 — skip regardless
-            evidence_against.append(f"Confidence {confidence:.0%} below 0.40 minimum gate")
+            verdict = "REJECT"         # below 0.30 — skip regardless
+            evidence_against.append(f"Confidence {confidence:.0%} below 0.30 minimum gate")
     elif ppo_action == 3:
         verdict = "EXECUTE"
     else:
@@ -579,14 +700,13 @@ def classify_setup_quality(conditions, confidence, memory, perception):
     atr_pct    = perception.get('atr_pct', 0.02)
     expectancy = memory.get_expectancy(conditions)
 
-    # TRASH: block unconditionally
-    if regime == 'HIGH_VOLATILITY' and atr_pct > 0.03:
-        return 'TRASH'
+    # TRASH: block unconditionally (regime block removed — every regime tradeable)
     if expectancy is not None and expectancy < -0.3:
         return 'TRASH'
 
     # A+: best setups
-    regime_ok     = regime in ('RANGING', 'TRENDING_BULL', 'TRENDING_BEAR')
+    regime_ok     = regime in ('RANGING', 'TRENDING_BULL', 'TRENDING_BEAR',
+                               'STRONG_BULL', 'STRONG_BEAR')
     volume_ok     = volume in ('HIGH', 'VERY_HIGH')
     momentum_ok   = momentum in ('STRONG_UP', 'STRONG_DOWN', 'WEAK_UP', 'WEAK_DOWN')
     expectancy_ok = expectancy is None or expectancy >= 0.2
@@ -599,24 +719,31 @@ def classify_setup_quality(conditions, confidence, memory, perception):
     if regime_not_bad and volume_not_low and confidence >= 0.58:
         return 'A'
 
-    # B: marginal — FIX: confidence >= 0.45 required (was 0.0)
-    if confidence >= 0.45 and regime != 'HIGH_VOLATILITY':
+    # B: marginal — confidence gate only (regime restriction removed)
+    if confidence >= 0.45:
         return 'B'
+
+    # C: marginal but executable — WEAK_EXECUTE range (0.30-0.45)
+    if confidence >= 0.30:
+        return 'C'
 
     return 'TRASH'
 
 
 # ── LAYER 4: DECISION + EXPLANATION ──────────────────────────────────────────
 
-def decide(ppo_action, conditions, perception, memory, narrative, sentiment_signal=None):
+def decide(ppo_action, conditions, perception, memory, narrative, sentiment_signal=None,
+           model_probs=None):
     """
     sentiment_signal: optional dict from SentimentAgent
+    model_probs: optional PPO policy action probabilities (see reason())
     Returns (verdict, confidence, reasoning_text, tier)
     """
     action_names = {0: "HOLD", 1: "BUY", 2: "SELL", 3: "CLOSE"}
 
     verdict, confidence, evidence_for, evidence_against = reason(
-        ppo_action, conditions, perception, memory, sentiment_signal
+        ppo_action, conditions, perception, memory, sentiment_signal,
+        model_probs=model_probs
     )
 
     lines = []
@@ -647,6 +774,12 @@ def decide(ppo_action, conditions, perception, memory, narrative, sentiment_sign
     expectancy = memory.get_expectancy(conditions)
     if expectancy is not None:
         lines.append(f"Expectancy: {expectancy:+.2f}R per trade")
+    if model_probs is not None:
+        try:
+            lines.append("Model P(H/L/S/C): " +
+                         "/".join(f"{float(p):.0%}" for p in model_probs))
+        except Exception:
+            pass
     lines.append(f"Confidence: {confidence:.0%}")
     lines.append(f"Quality: {tier}")
     lines.append(f"Verdict: {verdict}")

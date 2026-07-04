@@ -276,6 +276,135 @@ class CryptoMTFEnv(gym.Env):
               f"WR: {wr:.1%} ({self.wins}W/{self.losses}L)")
 
 
+# ── Technical Indicator Environment (44 features) ────────────────────────────
+# MTF_15M_RETRAIN
+
+class CryptoTechEnv(CryptoMTFEnv):  # MTF_15M_RETRAIN
+    """Extends CryptoMTFEnv with 8 technical indicator features (36 → 44).  # MTF_15M_RETRAIN
+    The PPO model can now learn which technical conditions produce profitable trades,  # MTF_15M_RETRAIN
+    aligning its signals with the reasoning engine's filters."""  # MTF_15M_RETRAIN
+
+    def __init__(self, df, **kwargs):  # MTF_15M_RETRAIN
+        super().__init__(df, **kwargs)  # MTF_15M_RETRAIN
+        self.N_FEATURES = 44  # MTF_15M_RETRAIN
+        self.observation_space = spaces.Box(  # MTF_15M_RETRAIN
+            low=-1.0, high=1.0,  # MTF_15M_RETRAIN
+            shape=(self.N_FEATURES,), dtype=np.float32  # MTF_15M_RETRAIN
+        )  # MTF_15M_RETRAIN
+
+    def _get_obs(self, i):  # MTF_15M_RETRAIN
+        # Get base 36 features (temporarily set N_FEATURES=36 for parent assert)  # MTF_15M_RETRAIN
+        saved = self.N_FEATURES  # MTF_15M_RETRAIN
+        self.N_FEATURES = 36  # MTF_15M_RETRAIN
+        base_obs = super()._get_obs(i)  # MTF_15M_RETRAIN
+        self.N_FEATURES = saved  # MTF_15M_RETRAIN
+
+        df = self.df  # MTF_15M_RETRAIN
+        c = float(df['close'].iloc[i])  # MTF_15M_RETRAIN
+
+        # 1. trend_score: price vs HTF closes  # MTF_15M_RETRAIN
+        h4c = float(df['h4_close'].iloc[i])  # MTF_15M_RETRAIN
+        d1c = float(df['d1_close'].iloc[i])  # MTF_15M_RETRAIN
+        w1c = float(df['w1_close'].iloc[i]) if 'w1_close' in df.columns else d1c  # MTF_15M_RETRAIN
+        above = sum([c > h4c * 1.001, c > d1c * 1.001, c > w1c * 1.001])  # MTF_15M_RETRAIN
+        trend_score = {3: 1.0, 2: 0.5, 1: -0.5, 0: -1.0}[above]  # MTF_15M_RETRAIN
+
+        # 2. momentum_score: 3-bar return  # MTF_15M_RETRAIN
+        prev_c = float(df['close'].iloc[max(0, i - 3)])  # MTF_15M_RETRAIN
+        mom = (c - prev_c) / (prev_c + 1e-8)  # MTF_15M_RETRAIN
+        if mom > 0.015:    momentum_score = 1.0  # MTF_15M_RETRAIN
+        elif mom > 0:      momentum_score = 0.5  # MTF_15M_RETRAIN
+        elif mom > -0.015: momentum_score = -0.5  # MTF_15M_RETRAIN
+        else:              momentum_score = -1.0  # MTF_15M_RETRAIN
+
+        # 3. volume_score  # MTF_15M_RETRAIN
+        vol_w = df['volume'].iloc[max(0, i - 20):i]  # MTF_15M_RETRAIN
+        avg_vol = float(vol_w.mean()) + 1e-8  # MTF_15M_RETRAIN
+        vol_ratio = float(df['volume'].iloc[i]) / avg_vol  # MTF_15M_RETRAIN
+        if vol_ratio > 2.0:   volume_score = 1.0  # MTF_15M_RETRAIN
+        elif vol_ratio > 1.4: volume_score = 0.5  # MTF_15M_RETRAIN
+        elif vol_ratio > 0.7: volume_score = 0.0  # MTF_15M_RETRAIN
+        else:                 volume_score = -0.5  # MTF_15M_RETRAIN
+
+        # 4. volatility_score (ATR-based)  # MTF_15M_RETRAIN
+        highs = df['high'].values  # MTF_15M_RETRAIN
+        lows = df['low'].values  # MTF_15M_RETRAIN
+        closes = df['close'].values  # MTF_15M_RETRAIN
+        atr_sum = 0.0  # MTF_15M_RETRAIN
+        atr_n = 0  # MTF_15M_RETRAIN
+        for j in range(max(1, i - 13), i + 1):  # MTF_15M_RETRAIN
+            tr = max(highs[j] - lows[j],  # MTF_15M_RETRAIN
+                     abs(highs[j] - closes[j - 1]),  # MTF_15M_RETRAIN
+                     abs(lows[j] - closes[j - 1]))  # MTF_15M_RETRAIN
+            atr_sum += tr  # MTF_15M_RETRAIN
+            atr_n += 1  # MTF_15M_RETRAIN
+        atr = atr_sum / max(atr_n, 1)  # MTF_15M_RETRAIN
+        atr_pct = atr / max(c, 0.01)  # MTF_15M_RETRAIN
+        if atr_pct > 0.025:   volatility_score = 1.0  # MTF_15M_RETRAIN
+        elif atr_pct > 0.010: volatility_score = 0.0  # MTF_15M_RETRAIN
+        else:                 volatility_score = -1.0  # MTF_15M_RETRAIN
+
+        # 5. regime_score (derived from above)  # MTF_15M_RETRAIN
+        if volatility_score == 1.0:  # MTF_15M_RETRAIN
+            regime_score = -1.0  # HIGH_VOLATILITY  # MTF_15M_RETRAIN
+        elif trend_score == 1.0 and momentum_score >= 0.5 and volume_score >= 0.0:  # MTF_15M_RETRAIN
+            regime_score = 0.5  # TRENDING_BULL  # MTF_15M_RETRAIN
+        elif trend_score == -1.0 and momentum_score <= -0.5 and volume_score >= 0.0:  # MTF_15M_RETRAIN
+            regime_score = 0.5  # TRENDING_BEAR  # MTF_15M_RETRAIN
+        elif abs(trend_score) <= 0.5 and abs(momentum_score) <= 0.5 and volume_score <= 0.0:  # MTF_15M_RETRAIN
+            regime_score = 1.0  # RANGING  # MTF_15M_RETRAIN
+        else:  # MTF_15M_RETRAIN
+            regime_score = -0.5  # LOW_QUALITY  # MTF_15M_RETRAIN
+
+        # 6. atr_pct_norm  # MTF_15M_RETRAIN
+        atr_pct_norm = float(np.clip((atr_pct - 0.02) / 0.02, -1, 1))  # MTF_15M_RETRAIN
+
+        # 7. fvg_score (3-bar gap)  # MTF_15M_RETRAIN
+        fvg_score = 0.0  # MTF_15M_RETRAIN
+        if i >= 2:  # MTF_15M_RETRAIN
+            bar2_high = float(df['high'].iloc[i - 2])  # MTF_15M_RETRAIN
+            bar2_low = float(df['low'].iloc[i - 2])  # MTF_15M_RETRAIN
+            cur_low = float(df['low'].iloc[i])  # MTF_15M_RETRAIN
+            cur_high = float(df['high'].iloc[i])  # MTF_15M_RETRAIN
+            if bar2_high < cur_low:  fvg_score = 1.0  # bullish  # MTF_15M_RETRAIN
+            elif bar2_low > cur_high: fvg_score = -1.0  # bearish  # MTF_15M_RETRAIN
+
+        # 8. wick_score  # MTF_15M_RETRAIN
+        o = float(df['open'].iloc[i])  # MTF_15M_RETRAIN
+        h = float(df['high'].iloc[i])  # MTF_15M_RETRAIN
+        l = float(df['low'].iloc[i])  # MTF_15M_RETRAIN
+        rng = h - l + 1e-9  # MTF_15M_RETRAIN
+        upper_wick = (h - max(o, c)) / rng  # MTF_15M_RETRAIN
+        lower_wick = (min(o, c) - l) / rng  # MTF_15M_RETRAIN
+        if lower_wick > 0.6:   wick_score = 1.0  # MTF_15M_RETRAIN
+        elif upper_wick > 0.6: wick_score = -1.0  # MTF_15M_RETRAIN
+        else:                  wick_score = 0.0  # MTF_15M_RETRAIN
+
+        tech = np.array([trend_score, momentum_score, volume_score,  # MTF_15M_RETRAIN
+                         volatility_score, regime_score, atr_pct_norm,  # MTF_15M_RETRAIN
+                         fvg_score, wick_score], dtype=np.float32)  # MTF_15M_RETRAIN
+        obs = np.concatenate([base_obs, tech])  # MTF_15M_RETRAIN
+        assert len(obs) == self.N_FEATURES, f"Expected {self.N_FEATURES}, got {len(obs)}"  # MTF_15M_RETRAIN
+        return obs  # MTF_15M_RETRAIN
+
+
+class CryptoTechRREnv(CryptoTechEnv):  # MTF_15M_RETRAIN
+    """CryptoTechEnv with R:R-aware reward (penalizes small wins <2.5%)."""  # MTF_15M_RETRAIN
+    MIN_PROFIT_PCT = 0.025  # MTF_15M_RETRAIN: 2.5% matches new SL/TP
+
+    def step(self, action):  # MTF_15M_RETRAIN
+        obs, reward, done, truncated, info = super().step(action)  # MTF_15M_RETRAIN
+        if info.get('trade_closed', False):  # MTF_15M_RETRAIN
+            pnl_pct = info.get('pnl_pct', 0)  # MTF_15M_RETRAIN
+            if pnl_pct >= self.MIN_PROFIT_PCT:  # MTF_15M_RETRAIN
+                reward = 3.0  # MTF_15M_RETRAIN
+            elif pnl_pct >= 0:  # MTF_15M_RETRAIN
+                reward = -0.5  # MTF_15M_RETRAIN
+            else:  # MTF_15M_RETRAIN
+                reward = -2.0  # MTF_15M_RETRAIN
+        return obs, reward, done, truncated, info  # MTF_15M_RETRAIN
+
+
 class CryptoRREnv(CryptoMTFEnv):
     """
     Subclass with RR-aware reward. Forces agent to find 1.5%+ moves.
