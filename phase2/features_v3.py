@@ -34,6 +34,8 @@ Sanity check on downloaded data:
     python features_v3.py --check
 """
 
+from __future__ import annotations
+
 import argparse
 import os
 
@@ -210,7 +212,9 @@ def _check():
         fpath = os.path.join(data_dir, f"{sym}_funding.csv")
         funding = pd.read_csv(fpath) if os.path.exists(fpath) else None
         if funding is not None:
-            funding["fundingTime"] = pd.to_datetime(funding["fundingTime"], utc=True)
+            funding["fundingTime"] = pd.to_datetime(
+                funding["fundingTime"], utc=True, format="ISO8601"
+            )
         feats = build_features_v3(df, funding, None if sym == "BTCUSDT" else btc)
         print(f"\n{sym}: {len(feats)} rows, {feats.shape[1]} features")
         print(feats.describe().T[["mean", "std", "min", "max"]].round(4))
