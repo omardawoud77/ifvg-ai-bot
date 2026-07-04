@@ -1,0 +1,6 @@
+stable-baselines3==2.7.1
+gymnasium
+torch
+yfinance
+pandas
+numpy
