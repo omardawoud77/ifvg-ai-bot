@@ -43,6 +43,13 @@ import os
 import numpy as np
 import pandas as pd
 
+def _to_ts(series: pd.Series) -> pd.Series:
+    """open_time may be epoch-ms ints (fetch_1m) or ISO strings (data_pipeline)."""
+    if pd.api.types.is_numeric_dtype(series):
+        return pd.to_datetime(series, unit="ms", utc=True)
+    return pd.to_datetime(series, utc=True, format="ISO8601")
+
+
 N_BINS = 40            # price bins per daily profile
 VALUE_AREA = 0.70      # standard 70% value area
 LVN_FRAC = 0.30        # bin is an LVN if vol < 30% of median bin vol
@@ -54,7 +61,7 @@ CLIP = 10.0
 def _daily_profiles(df_1m: pd.DataFrame) -> pd.DataFrame:
     """One row per completed UTC day: POC, VAH, VAL, LVN price list."""
     m = df_1m.copy()
-    m["ts"] = pd.to_datetime(m["open_time"], unit="ms", utc=True)
+    m["ts"] = _to_ts(m["open_time"])
     m["date"] = m["ts"].dt.date
     for c in ("high", "low", "close", "volume"):
         m[c] = m[c].astype(float)
@@ -114,7 +121,7 @@ def _naked_pocs_asof(profiles: pd.DataFrame) -> list:
 def build_orderflow_features(df_1h: pd.DataFrame,
                              df_1m: pd.DataFrame) -> pd.DataFrame:
     h = df_1h.copy()
-    h["ts"] = pd.to_datetime(h["open_time"], unit="ms", utc=True)
+    h["ts"] = _to_ts(h["open_time"])
     h["date"] = h["ts"].dt.date
     for c in ("close", "volume", "taker_buy_base"):
         h[c] = h[c].astype(float)
