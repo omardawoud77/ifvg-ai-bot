@@ -22,15 +22,19 @@ cd "$REPO_DIR" || { echo "  repo dir missing" >> "$LOG"; exit 1; }
 for sym in btcusdt ethusdt solusdt; do
   tmp="$(mktemp)"
   got=""
-  for rp in "${REMOTE_PATHS[@]}"; do
-    # keep only the CSV header + ISO-timestamp rows — railway ssh can return
-    # a gateway JSON blob mid-deploy, which must never reach the archive
-    railway ssh -- cat "$rp/shadow_log_${sym}.csv" 2>/dev/null \
-      | grep -E '^(ts_utc,|20[0-9]{2}-)' > "$tmp"
-    if [ -s "$tmp" ]; then
-      got="$rp"
-      break
-    fi
+  # railway ssh flakes transiently — retry each path up to 3 times
+  for attempt in 1 2 3; do
+    for rp in "${REMOTE_PATHS[@]}"; do
+      # keep only the CSV header + ISO-timestamp rows — railway ssh can return
+      # a gateway JSON blob mid-deploy, which must never reach the archive
+      railway ssh -- cat "$rp/shadow_log_${sym}.csv" 2>/dev/null \
+        | grep -E '^(ts_utc,|20[0-9]{2}-)' > "$tmp"
+      if [ -s "$tmp" ]; then
+        got="$rp"
+        break 2
+      fi
+    done
+    sleep 3
   done
   if [ -z "$got" ]; then
     echo "  $sym: no remote file found (bot restarted recently?)" >> "$LOG"
